@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Vyaparhood",
+    "slug": "vyaparhood",
+    "scheme": "vyaparhood",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F9FAFF",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "in.vyaparhood.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We use this to show you what's happening in your own city from the moment you open the app — nearby members, local requests, real distances."
+      }
+    },
+    "android": {
+      "package": "in.vyaparhood.app",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+      "blockedPermissions": ["ACCESS_BACKGROUND_LOCATION"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "We use this to show you what's happening in your own city from the moment you open the app — nearby members, local requests, real distances.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Vyaparhood needs your photos so you can add a profile picture.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
+    ]
+  }
+}

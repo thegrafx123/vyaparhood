@@ -1,0 +1,38 @@
+/**
+ * All icons come from lucide-react-native. If an icon name ever changes
+ * in a lucide update, fix it here and the whole app follows.
+ */
+export {
+  ArrowRight,
+  AtSign,
+  Bell,
+  Bookmark,
+  Calendar,
+  Camera,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleUserRound,
+  Coffee,
+  Compass,
+  CreditCard,
+  Ellipsis,
+  Heart,
+  Image as ImageGlyph,
+  Inbox,
+  Lock,
+  Mail,
+  MapPin,
+  MessageSquare,
+  Search,
+  Send,
+  Settings,
+  ShieldCheck,
+  SlidersHorizontal,
+  Star,
+  Target,
+  Timer,
+  Upload,
+  X,
+} from 'lucide-react-native';
