@@ -23,7 +23,7 @@ export function OnboardingPage({ step, heading, subtitle, cta, onNext, children,
   return (
     <Screen>
       {background}
-      <BrandHeader onSkip={() => router.replace('/auth/phone')} />
+      <BrandHeader onSkip={() => router.replace('/auth/email')} />
       <View style={styles.head}>
         <Heading parts={heading} />
         <Text style={[t.subtitle, { marginTop: s(8), maxWidth: s(330) }]}>{subtitle}</Text>

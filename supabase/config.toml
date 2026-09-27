@@ -1,0 +1,9 @@
+# Minimal Supabase CLI config. `supabase link --project-ref <ref>` points
+# the CLI at the dev or prod project before `db push` / `functions deploy`.
+project_id = "vyaparhood"
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.purge-expired-documents]
+verify_jwt = false

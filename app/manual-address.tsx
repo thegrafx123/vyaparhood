@@ -6,7 +6,10 @@ import { TextField } from '../src/components/Controls';
 import { Heading } from '../src/components/Heading';
 import { MapPin } from '../src/components/icons';
 import { BrandHeader, Footer, KeyboardArea, Screen } from '../src/components/Layout';
+import { routeForMe } from '../src/lib/routing';
+import { syncLocation } from '../src/lib/syncLocation';
 import { resolveLocation } from '../src/services/location';
+import { useAuth } from '../src/state/AuthProvider';
 import { useApp } from '../src/state/AppStore';
 import { colors, fonts, H_PAD, s } from '../src/theme/tokens';
 import { type as t } from '../src/theme/typography';
@@ -21,6 +24,8 @@ import { digitsOnly, isValidPincode } from '../src/utils/validation';
 export default function ManualAddress() {
   const router = useRouter();
   const { state, actions } = useApp();
+  const { session, refreshMe } = useAuth();
+  const [saving, setSaving] = useState(false);
   const [pincode, setPincode] = useState('');
   const [locality, setLocality] = useState('');
   const [city, setCity] = useState('');
@@ -38,21 +43,32 @@ export default function ManualAddress() {
   );
   const valid = !errors.pincode && !errors.locality && !errors.city;
 
+  /** Signed-in users go back to where they were; new users continue to Welcome. */
+  const proceed = async (loc: Parameters<typeof syncLocation>[0]) => {
+    if (!session) {
+      router.replace('/welcome');
+      return;
+    }
+    setSaving(true);
+    await syncLocation(loc);
+    const me = await refreshMe().catch(() => null);
+    setSaving(false);
+    router.replace(routeForMe(me) as never);
+  };
+
   const onContinue = () => {
     if (!valid) {
       setTouched({ pincode: true, locality: true, city: true });
       return;
     }
-    actions.setLocation({
-      source: 'manual',
-      manualAddress: {
-        pincode: pincode.trim(),
-        locality: locality.trim(),
-        city: city.trim(),
-        line: line.trim(),
-      },
-    });
-    router.replace('/welcome');
+    const manualAddress = {
+      pincode: pincode.trim(),
+      locality: locality.trim(),
+      city: city.trim(),
+      line: line.trim(),
+    };
+    actions.setLocation({ source: 'manual', manualAddress });
+    proceed({ ...state.location, coords: null, source: 'manual', manualAddress });
   };
 
   const useMyLocation = async () => {
@@ -64,14 +80,17 @@ export default function ManualAddress() {
     const result = await resolveLocation();
     setRetrying(false);
     if (result.status === 'granted') {
-      actions.setLocation({
-        status: 'granted',
-        source: 'device',
+      const loc = {
+        ...state.location,
+        status: 'granted' as const,
+        source: 'device' as const,
         coords: result.coords,
         geohash: result.geohash,
         detectedCity: result.city,
-      });
-      router.replace('/welcome');
+        detectedArea: result.area,
+      };
+      actions.setLocation(loc);
+      proceed(loc);
     } else if (result.status === 'denied') {
       actions.setLocation({ status: 'denied', canAskAgain: result.canAskAgain });
     }
@@ -141,7 +160,7 @@ export default function ManualAddress() {
           </Pressable>
         </ScrollView>
         <Footer>
-          <PrimaryButton label="Continue" onPress={onContinue} disabled={!valid} />
+          <PrimaryButton label="Continue" onPress={onContinue} disabled={!valid} loading={saving} />
         </Footer>
       </KeyboardArea>
     </Screen>

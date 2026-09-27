@@ -6,24 +6,25 @@ import { Check, ChevronRight, Settings } from '../../src/components/icons';
 import { Divider, Screen } from '../../src/components/Layout';
 import { ShadowBox } from '../../src/components/ShadowBox';
 import { categoryLabel, SUPPORT_EMAIL } from '../../src/config';
-import { FALLBACK_ME } from '../../src/data/sample';
-import { displayName, myCity, useApp } from '../../src/state/AppStore';
+import { useSignedUrl, useStats } from '../../src/api/hooks';
+import { useAuth } from '../../src/state/AuthProvider';
 import { BORDER, colors, fonts, s, TAB_PAD } from '../../src/theme/tokens';
 import { type as t } from '../../src/theme/typography';
 
 /** 27 · My profile. */
 export default function MyProfile() {
   const router = useRouter();
-  const { state } = useApp();
-  const p = state.profile;
-  const name = displayName(state);
-  const subtitle = `${p.building.trim() || FALLBACK_ME.role} · ${myCity(state)}`;
-  const category = p.category ?? FALLBACK_ME.category;
+  const { me } = useAuth();
+  const { data: st } = useStats();
+  const p = me?.profile;
+  const photo = useSignedUrl('avatars', p?.photo_path);
+  if (!p) return null;
+  const subtitle = [p.headline || p.building, p.city].filter(Boolean).join(' · ');
 
   const stats = [
-    { value: String(state.chats.length), label: 'Connections' },
-    { value: String(state.requestsSentCount), label: 'Requests sent' },
-    { value: '—', label: 'Rating' }, // ratings received come from the backend later
+    { value: String(st?.connections ?? '—'), label: 'Connections' },
+    { value: String(st?.requests_sent ?? '—'), label: 'Requests sent' },
+    { value: st?.rating != null ? Number(st.rating).toFixed(1) : '—', label: 'Rating' },
   ];
 
   return (
@@ -38,16 +39,16 @@ export default function MyProfile() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: TAB_PAD, paddingBottom: s(24) }}>
         <ShadowBox radius={s(32)} color={colors.shadowSoft} offset={{ x: s(4), y: s(5) }} style={{ marginTop: s(16) }}>
           <View style={styles.card}>
-            {p.photoUri ? (
-              <Image source={{ uri: p.photoUri }} style={styles.photo} />
+            {photo ? (
+              <Image source={{ uri: photo }} style={styles.photo} />
             ) : (
               <Hatched radius={s(40)} dashed={colors.lime} iconSize={s(22)} style={styles.photo} />
             )}
             <View style={styles.nameRow}>
               <Text style={styles.name} numberOfLines={1}>
-                {name}
+                {p.full_name}
               </Text>
-              {state.verification === 'verified' && (
+              {p.verification_status === 'verified' && (
                 <View style={styles.badge}>
                   <Check size={s(12)} color={colors.ink} strokeWidth={3.2} />
                 </View>
@@ -56,7 +57,7 @@ export default function MyProfile() {
             <Text style={styles.sub} numberOfLines={1}>
               {subtitle}
             </Text>
-            {state.verification === 'pending' && <Text style={styles.pending}>Verification under review</Text>}
+            {p.verification_status === 'pending' && <Text style={styles.pending}>Verification under review</Text>}
             <Pressable style={styles.edit} onPress={() => router.push('/edit-profile')}>
               <Text style={styles.editText}>Edit profile</Text>
             </Pressable>
@@ -74,7 +75,7 @@ export default function MyProfile() {
 
         <Text style={[t.label, { marginTop: s(24), marginBottom: s(10) }]}>Categories</Text>
         <View style={styles.catChip}>
-          <Text style={styles.catText}>{categoryLabel(category)}</Text>
+          <Text style={styles.catText}>{p.category ? categoryLabel(p.category) : 'Not set'}</Text>
         </View>
 
         <View style={{ marginTop: s(24) }}>

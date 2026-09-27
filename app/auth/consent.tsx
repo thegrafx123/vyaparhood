@@ -1,6 +1,9 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as api from '../../src/api';
+import { friendlyError } from '../../src/api/errors';
+import { useAuth } from '../../src/state/AuthProvider';
 import { PrimaryButton } from '../../src/components/Buttons';
 import { Checkbox } from '../../src/components/Controls';
 import { Heading } from '../../src/components/Heading';
@@ -15,6 +18,22 @@ export default function Consent() {
   const [checks, setChecks] = useState([false, false, false]);
   const toggle = (i: number) => setChecks((c) => c.map((v, j) => (j === i ? !v : v)));
   const all = checks.every(Boolean);
+  const { refreshMe } = useAuth();
+  const [saving, setSaving] = useState(false);
+
+  /** Stores when they agreed (needed for DPDP consent records). */
+  const agree = async () => {
+    setSaving(true);
+    try {
+      await api.me.update({ consented_at: new Date().toISOString() });
+      await refreshMe();
+      router.push('/auth/city');
+    } catch (e) {
+      Alert.alert("Couldn't save", friendlyError(e));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const Link = ({ label, href }: { label: string; href: string }) => (
     <Text style={styles.link} onPress={() => router.push(href as never)}>
@@ -58,7 +77,7 @@ export default function Consent() {
         </View>
       </View>
       <Footer>
-        <PrimaryButton label="Agree & Continue" onPress={() => router.push('/auth/city')} disabled={!all} />
+        <PrimaryButton label="Agree & Continue" onPress={agree} disabled={!all} loading={saving} />
       </Footer>
     </Screen>
   );

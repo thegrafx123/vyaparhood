@@ -1,0 +1,36 @@
+{
+  "cli": { "version": ">= 16.0.0", "appVersionSource": "remote" },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "development",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR-DEV-REF.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR-DEV-ANON-KEY",
+        "EXPO_PUBLIC_SENTRY_DSN": "YOUR-SENTRY-DSN",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "development",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR-DEV-REF.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR-DEV-ANON-KEY",
+        "EXPO_PUBLIC_SENTRY_DSN": "YOUR-SENTRY-DSN",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR-PROD-REF.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR-PROD-ANON-KEY",
+        "EXPO_PUBLIC_SENTRY_DSN": "YOUR-SENTRY-DSN"
+      }
+    }
+  },
+  "submit": { "production": {} }
+}

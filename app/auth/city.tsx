@@ -1,6 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import * as api from '../../src/api';
+import { friendlyError } from '../../src/api/errors';
+import { useAuth } from '../../src/state/AuthProvider';
 import { PrimaryButton } from '../../src/components/Buttons';
 import { Chip } from '../../src/components/Controls';
 import { Heading } from '../../src/components/Heading';
@@ -16,8 +20,12 @@ export default function City() {
   const router = useRouter();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const { state, actions } = useApp();
+  const { me, refreshMe } = useAuth();
+  const qc = useQueryClient();
+  const [saving, setSaving] = useState(false);
 
-  const guess = state.city ?? state.location.manualAddress?.city ?? state.location.detectedCity ?? null;
+  const guess =
+    me?.profile.city ?? state.city ?? state.location.manualAddress?.city ?? state.location.detectedCity ?? null;
   const initial = guess ? ALL_CITIES.find((c) => c.toLowerCase() === guess.toLowerCase()) ?? null : null;
   const [selected, setSelected] = useState<string | null>(initial);
   const [query, setQuery] = useState('');
@@ -30,11 +38,24 @@ export default function City() {
     return ALL_CITIES.filter((c) => c.toLowerCase().includes(q));
   }, [query, selected]);
 
-  const onContinue = () => {
+  const onContinue = async () => {
     if (!selected) return;
-    actions.patch({ city: selected });
-    if (mode === 'change') router.back();
-    else router.push('/auth/profile-setup');
+    actions.setCity(selected);
+    if (mode !== 'change') {
+      router.push('/auth/profile-setup');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.me.update({ city: selected });
+      await refreshMe();
+      qc.invalidateQueries({ queryKey: ['discover'] });
+      router.back();
+    } catch (e) {
+      Alert.alert("Couldn't change city", friendlyError(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -67,7 +88,7 @@ export default function City() {
           </View>
         </ScrollView>
         <Footer>
-          <PrimaryButton label="Continue" onPress={onContinue} disabled={!selected} />
+          <PrimaryButton label="Continue" onPress={onContinue} disabled={!selected} loading={saving} />
         </Footer>
       </KeyboardArea>
     </Screen>

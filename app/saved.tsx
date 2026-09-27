@@ -1,40 +1,41 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Avatar } from '../src/components/Hatched';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSaved, useSetSaved } from '../src/api/hooks';
 import { Bookmark } from '../src/components/icons';
 import { HeaderRow, Screen, SoftCard } from '../src/components/Layout';
-import { getMember, useApp } from '../src/state/AppStore';
+import { MemberAvatar } from '../src/components/MemberAvatar';
 import { colors, fonts, s, TAB_PAD } from '../src/theme/tokens';
 import { type as t } from '../src/theme/typography';
 
 /** 29 · Saved profiles. */
 export default function Saved() {
   const router = useRouter();
-  const { state, actions } = useApp();
-  const members = state.savedIds.map((id) => getMember(state, id)).filter((m): m is NonNullable<typeof m> => !!m);
+  const { data = [], isLoading } = useSaved();
+  const setSaved = useSetSaved();
 
   return (
     <Screen>
       <HeaderRow title="Saved profiles" style={{ paddingHorizontal: TAB_PAD }} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: TAB_PAD, paddingTop: s(22), paddingBottom: s(30) }}>
-        {members.map((m) => (
+        {isLoading && <ActivityIndicator color={colors.blue} />}
+        {data.map((m) => (
           <SoftCard key={m.id} radius={s(24)} style={{ marginBottom: s(14) }}>
             <Pressable style={styles.row} onPress={() => router.push(`/member/${m.id}`)}>
-              <Avatar size={s(50)} radius={s(14)} />
+              <MemberAvatar path={m.photo_path} size={s(50)} radius={s(14)} />
               <View style={{ flex: 1, marginLeft: s(14) }}>
-                <Text style={t.name}>{m.name}</Text>
+                <Text style={t.name}>{m.full_name}</Text>
                 <Text style={styles.role} numberOfLines={1}>
-                  {m.role}
+                  {m.headline}
                 </Text>
               </View>
-              <Pressable onPress={() => actions.toggleSaved(m.id)} hitSlop={12} accessibilityLabel={`Remove ${m.name} from saved`}>
+              <Pressable onPress={() => setSaved.mutate({ memberId: m.id, save: false })} hitSlop={12} accessibilityLabel={`Remove ${m.full_name} from saved`}>
                 <Bookmark size={s(24)} color={colors.ink} fill={colors.lime} strokeWidth={1.8} />
               </Pressable>
             </Pressable>
           </SoftCard>
         ))}
-        {members.length === 0 && (
+        {!isLoading && data.length === 0 && (
           <Text style={[t.bodyInk, { textAlign: 'center', marginTop: s(40) }]}>
             Save profiles from the ⋯ menu on any member to find them here later.
           </Text>

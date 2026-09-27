@@ -9,7 +9,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { TagTone } from '../data/sample';
+import { TagTone } from '../api/types';
 import { BORDER, colors, fonts, s } from '../theme/tokens';
 import { type as t } from '../theme/typography';
 import { Check } from './icons';

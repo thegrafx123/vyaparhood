@@ -1,10 +1,15 @@
+import { useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as api from '../../src/api';
+import { friendlyError } from '../../src/api/errors';
+import { keys, useDocuments } from '../../src/api/hooks';
+import { VerificationDoc } from '../../src/api/types';
 import { PrimaryButton } from '../../src/components/Buttons';
-import { Heading } from '../../src/components/Heading';
 import { Hatched } from '../../src/components/Hatched';
+import { Heading } from '../../src/components/Heading';
 import { Check, CreditCard, Upload, X } from '../../src/components/icons';
 import { Footer, HeaderRow, Screen } from '../../src/components/Layout';
 import {
@@ -13,46 +18,71 @@ import {
   MAX_DOCUMENT_MB,
   REQUIRE_BUSINESS_PROOF,
 } from '../../src/config';
-import { PickedFile, useApp } from '../../src/state/AppStore';
+import { reportError } from '../../src/lib/sentry';
+import { useAuth } from '../../src/state/AuthProvider';
 import { BORDER, colors, fonts, H_PAD, s } from '../../src/theme/tokens';
 import { type as t } from '../../src/theme/typography';
 
-async function pickDocument(): Promise<PickedFile | null> {
-  const res = await DocumentPicker.getDocumentAsync({
-    type: ['application/pdf', 'image/*'],
-    copyToCacheDirectory: true,
-    multiple: false,
-  });
-  if (res.canceled || !res.assets?.[0]) return null;
-  const a = res.assets[0];
-  if (a.size && a.size > MAX_DOCUMENT_MB * 1024 * 1024) {
-    Alert.alert('File too large', `Upload a PDF or photo under ${MAX_DOCUMENT_MB} MB.`);
-    return null;
-  }
-  return { name: a.name, uri: a.uri, size: a.size ?? null, mimeType: a.mimeType ?? null };
-}
+type Kind = VerificationDoc['kind'];
 
 /**
- * 12 · Verification documents (manual review).
- * Backend later: upload to a private bucket, admin-only access,
- * auto-delete after DOCUMENT_RETENTION_DAYS.
+ * 12 · Verification documents. Files go to the private
+ * "verification-docs" bucket (only you and admins can open them) and are
+ * permanently deleted after DOCUMENT_RETENTION_DAYS by a daily job.
  */
 export default function VerifyDocs() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const managing = mode === 'manage';
-  const { state, actions } = useApp();
-  const { businessProof, govId } = state.documents;
-  const hasAny = !!businessProof || !!govId;
-  const canSubmit = REQUIRE_BUSINESS_PROOF ? !!businessProof : true;
+  const { me, refreshMe } = useAuth();
+  const { data: docs = [], isLoading } = useDocuments();
+  const [busy, setBusy] = useState<Kind | null>(null);
 
-  const choose = async (key: 'businessProof' | 'govId') => {
-    const file = await pickDocument();
-    if (file) actions.setDocument(key, file);
+  const latest = (kind: Kind) => docs.find((d) => d.kind === kind) ?? null;
+  const businessProof = latest('business_proof');
+  const govId = latest('gov_id');
+  const hasAny = docs.length > 0;
+  const canSubmit = REQUIRE_BUSINESS_PROOF ? !!businessProof : true;
+  const status = me?.profile.verification_status ?? 'none';
+
+  const choose = async (kind: Kind) => {
+    const res = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    if (res.canceled || !res.assets?.[0]) return;
+    const a = res.assets[0];
+    if (a.size && a.size > MAX_DOCUMENT_MB * 1024 * 1024) {
+      Alert.alert('File too large', `Upload a PDF or photo under ${MAX_DOCUMENT_MB} MB.`);
+      return;
+    }
+    setBusy(kind);
+    try {
+      const existing = latest(kind);
+      if (existing && existing.status === 'pending') await api.documents.remove(existing);
+      await api.documents.upload(kind, { uri: a.uri, name: a.name, mimeType: a.mimeType ?? null, size: a.size ?? null });
+      await qc.invalidateQueries({ queryKey: keys.documents });
+      await refreshMe();
+    } catch (e) {
+      reportError(e, { where: 'upload-doc', kind });
+      Alert.alert("Couldn't upload", friendlyError(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const remove = async (doc: VerificationDoc) => {
+    try {
+      await api.documents.remove(doc);
+      await qc.invalidateQueries({ queryKey: keys.documents });
+    } catch (e) {
+      Alert.alert("Couldn't remove", friendlyError(e));
+    }
   };
 
   const onSubmit = () => {
-    if (hasAny) actions.patch({ verification: 'pending' });
     if (managing) router.back();
     else router.push(hasAny ? '/auth/under-review' : '/auth/notifications');
   };
@@ -65,28 +95,35 @@ export default function VerifyDocs() {
         <Text style={[t.subtitle, { marginTop: s(8) }]}>
           This is what keeps Vyaparhood free of fake profiles and cold DMs.
         </Text>
+        {managing && (
+          <Text style={[t.label, { marginTop: s(12), color: status === 'verified' ? colors.teal : colors.yellow }]}>
+            Status: {status === 'verified' ? 'Verified ✓' : status === 'pending' ? 'Under review' : status === 'rejected' ? 'Not approved — please upload again' : 'Not submitted'}
+          </Text>
+        )}
 
-        <Text style={[t.label, { marginTop: s(28), marginBottom: s(10) }]}>
+        <Text style={[t.label, { marginTop: s(24), marginBottom: s(10) }]}>
           Business proof
           {!REQUIRE_BUSINESS_PROOF && <Text style={styles.optional}> (optional for now)</Text>}
         </Text>
         <UploadBox
-          file={businessProof}
+          doc={businessProof}
+          busy={busy === 'business_proof'}
           hint="GST certificate, shop license or website"
           icon={<Upload size={s(20)} color={colors.blue} strokeWidth={2.2} />}
-          onPick={() => choose('businessProof')}
-          onRemove={() => actions.setDocument('businessProof', null)}
+          onPick={() => choose('business_proof')}
+          onRemove={remove}
         />
 
         <Text style={[t.label, { marginTop: s(22), marginBottom: s(10) }]}>
           Government ID<Text style={styles.optional}> (optional — adds an extra trust badge)</Text>
         </Text>
         <UploadBox
-          file={govId}
+          doc={govId}
+          busy={busy === 'gov_id'}
           hint="Masked Aadhaar, PAN or driving licence"
           icon={<CreditCard size={s(20)} color={colors.blue} strokeWidth={2.2} />}
-          onPick={() => choose('govId')}
-          onRemove={() => actions.setDocument('govId', null)}
+          onPick={() => choose('gov_id')}
+          onRemove={remove}
         />
         <View style={styles.aadhaar}>
           <Text style={styles.aadhaarText}>
@@ -102,16 +139,17 @@ export default function VerifyDocs() {
         <View style={styles.note}>
           <Text style={styles.noteTitle}>🔒  Reviewed within 24 hours — you can keep exploring while we check.</Text>
           <Text style={styles.noteBody}>
-            Your documents are stored encrypted for up to {DOCUMENT_RETENTION_DAYS} days, seen only by our
+            Your documents are stored privately for up to {DOCUMENT_RETENTION_DAYS} days, seen only by our
             verification team, then permanently deleted.
           </Text>
         </View>
+        {isLoading && <ActivityIndicator style={{ marginTop: s(16) }} color={colors.blue} />}
       </ScrollView>
       <Footer>
         <PrimaryButton
-          label={managing ? 'Save documents' : hasAny ? 'Submit for review' : 'Skip for now'}
+          label={managing ? 'Done' : hasAny ? 'Submit for review' : 'Skip for now'}
           onPress={onSubmit}
-          disabled={!canSubmit}
+          disabled={!canSubmit || !!busy}
         />
       </Footer>
     </Screen>
@@ -119,33 +157,55 @@ export default function VerifyDocs() {
 }
 
 function UploadBox({
-  file,
+  doc,
+  busy,
   hint,
   icon,
   onPick,
   onRemove,
 }: {
-  file: PickedFile | null;
+  doc: VerificationDoc | null;
+  busy: boolean;
   hint: string;
   icon: React.ReactNode;
   onPick: () => void;
-  onRemove: () => void;
+  onRemove: (doc: VerificationDoc) => void;
 }) {
+  const statusText = doc
+    ? doc.status === 'approved'
+      ? 'Approved'
+      : doc.status === 'rejected'
+        ? 'Not approved · tap to upload again'
+        : 'Uploaded · tap to replace'
+    : hint;
   return (
-    <Pressable onPress={onPick} accessibilityRole="button" accessibilityLabel={file ? `Replace ${file.name}` : 'Tap to upload'}>
+    <Pressable
+      onPress={onPick}
+      disabled={busy || doc?.status === 'approved'}
+      accessibilityRole="button"
+      accessibilityLabel={doc ? `Replace ${doc.file_name}` : 'Tap to upload'}
+    >
       <Hatched radius={s(22)} showIcon={false} style={styles.upload}>
         <View style={styles.uploadRow}>
-          <View style={styles.uploadIcon}>{file ? <Check size={s(20)} color={colors.teal} strokeWidth={2.6} /> : icon}</View>
+          <View style={styles.uploadIcon}>
+            {busy ? (
+              <ActivityIndicator color={colors.blue} />
+            ) : doc ? (
+              <Check size={s(20)} color={colors.teal} strokeWidth={2.6} />
+            ) : (
+              icon
+            )}
+          </View>
           <View style={{ flex: 1, marginLeft: s(14) }}>
             <Text style={styles.uploadTitle} numberOfLines={1}>
-              {file ? file.name : 'Tap to upload'}
+              {busy ? 'Uploading…' : doc ? doc.file_name : 'Tap to upload'}
             </Text>
             <Text style={styles.uploadHint} numberOfLines={1}>
-              {file ? 'Uploaded · tap to replace' : hint}
+              {statusText}
             </Text>
           </View>
-          {file && (
-            <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel="Remove file">
+          {doc && doc.status === 'pending' && !busy && (
+            <Pressable onPress={() => onRemove(doc)} hitSlop={10} accessibilityLabel="Remove file">
               <X size={s(18)} color={colors.text} strokeWidth={2.2} />
             </Pressable>
           )}

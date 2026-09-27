@@ -1,38 +1,40 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Member } from '../data/sample';
+import { MemberCardData } from '../api/types';
 import { formatDistance } from '../services/location';
 import { colors, fonts, s } from '../theme/tokens';
 import { Tag } from './Controls';
-import { Avatar } from './Hatched';
+import { MemberAvatar } from './MemberAvatar';
 import { ArrowRight } from './icons';
 import { SoftCard } from './Layout';
 
-export function MemberCard({ member, onPress }: { member: Member; onPress: () => void }) {
+export function MemberCard({ member, onPress }: { member: MemberCardData; onPress: () => void }) {
   return (
     <SoftCard radius={s(26)} style={{ marginBottom: s(16) }}>
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={`${member.name}, ${member.role}`}
+        accessibilityLabel={`${member.full_name}, ${member.headline}`}
         style={({ pressed }) => [styles.inner, pressed && { opacity: 0.85 }]}
       >
         <View style={styles.top}>
-          <Avatar size={s(54)} radius={s(15)} verified={member.verified} />
+          <MemberAvatar path={member.photo_path} size={s(54)} radius={s(15)} verified={member.verified} />
           <View style={styles.texts}>
             <Text style={styles.name} numberOfLines={1}>
-              {member.name}
+              {member.full_name}
             </Text>
             <Text style={styles.role} numberOfLines={1}>
-              {member.role}
+              {member.headline}
             </Text>
             <Text style={styles.loc} numberOfLines={1}>
-              {member.area} · {formatDistance(member.distanceKm, member.sharesExactDistance)}
+              {[member.area, member.distance_km != null ? formatDistance(member.distance_km, member.distance_precise) : null]
+                .filter(Boolean)
+                .join(' · ')}
             </Text>
           </View>
         </View>
         <View style={styles.bottom}>
-          {member.tag ? <Tag label={member.tag.label} tone={member.tag.tone} /> : <View />}
+          {member.tag_label ? <Tag label={member.tag_label} tone={member.tag_tone ?? 'blue'} /> : <View />}
           <View style={styles.link}>
             <Text style={styles.linkText}>View profile</Text>
             <ArrowRight size={s(15)} color={colors.blue} strokeWidth={2.5} />

@@ -4,7 +4,7 @@ import ngeohash from 'ngeohash';
 export type Coords = { lat: number; lng: number };
 
 export type LocationResult =
-  | { status: 'granted'; coords: Coords; city: string | null; geohash: string | null }
+  | { status: 'granted'; coords: Coords; city: string | null; area: string | null; geohash: string | null }
   | { status: 'denied'; canAskAgain: boolean }
   | { status: 'unavailable' };
 
@@ -27,8 +27,8 @@ export async function resolveLocation(): Promise<LocationResult> {
     const coords = await getFix();
     if (!coords) return { status: 'unavailable' };
 
-    const city = await detectCity(coords);
-    return { status: 'granted', coords, city, geohash: toGeohash(coords.lat, coords.lng) };
+    const { city, area } = await detectPlace(coords);
+    return { status: 'granted', coords, city, area, geohash: toGeohash(coords.lat, coords.lng) };
   } catch (e) {
     console.warn('[location] could not resolve location', e);
     return { status: 'unavailable' };
@@ -47,15 +47,17 @@ async function getFix(): Promise<Coords | null> {
 }
 
 /** Uses the phone's built-in geocoder (free — no Google Maps API). */
-async function detectCity(coords: Coords): Promise<string | null> {
+async function detectPlace(coords: Coords): Promise<{ city: string | null; area: string | null }> {
   try {
     const [place] = await Location.reverseGeocodeAsync({
       latitude: coords.lat,
       longitude: coords.lng,
     });
-    return place?.city ?? place?.subregion ?? place?.district ?? null;
+    const city = place?.city ?? place?.subregion ?? null;
+    const area = place?.district ?? place?.subregion ?? null;
+    return { city, area: area && area !== city ? area : null };
   } catch {
-    return null;
+    return { city: null, area: null };
   }
 }
 

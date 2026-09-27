@@ -1,13 +1,13 @@
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useDiscover } from '../src/api/hooks';
 import { PrimaryButton } from '../src/components/Buttons';
 import { Chip, Toggle } from '../src/components/Controls';
 import { DistanceSlider } from '../src/components/DistanceSlider';
 import { BottomSheet } from '../src/components/Layout';
 import { CATEGORIES, CategoryId, DISTANCE_MAX_KM, DISTANCE_MIN_KM } from '../src/config';
-import { HIDDEN_FROM_DISCOVER } from '../src/data/sample';
-import { Filters, SortBy, useApp } from '../src/state/AppStore';
+import { DEFAULT_FILTERS, Filters, SortBy, useApp } from '../src/state/AppStore';
 import { colors, fonts, s } from '../src/theme/tokens';
 import { type as t } from '../src/theme/typography';
 
@@ -17,13 +17,20 @@ const SORTS: { id: SortBy; label: string }[] = [
   { id: 'rating', label: 'Top rated' },
 ];
 
-const DEFAULTS: Filters = { distanceKm: 4.5, categories: [], sortBy: 'nearest', verifiedOnly: true };
-
-/** 18 · Filters (bottom sheet over Discover). */
+/** 18 · Filters. The result count is a live query against Supabase. */
 export default function FiltersSheet() {
   const router = useRouter();
   const { state, actions } = useApp();
   const [draft, setDraft] = useState<Filters>(state.filters);
+
+  const { data: preview, isFetching } = useDiscover({
+    mode: 'nearby',
+    maxKm: draft.distanceKm,
+    categories: draft.categories,
+    verifiedOnly: draft.verifiedOnly,
+    sort: draft.sortBy,
+  });
+  const count = preview?.length ?? 0;
 
   const toggleCategory = (id: CategoryId) =>
     setDraft((d) => ({
@@ -31,24 +38,11 @@ export default function FiltersSheet() {
       categories: d.categories.includes(id) ? d.categories.filter((c) => c !== id) : [...d.categories, id],
     }));
 
-  const count = useMemo(
-    () =>
-      state.members.filter(
-        (m) =>
-          !state.blockedIds.includes(m.id) &&
-          !HIDDEN_FROM_DISCOVER.includes(m.id) &&
-          m.distanceKm <= draft.distanceKm &&
-          (draft.categories.length === 0 || draft.categories.includes(m.category)) &&
-          (!draft.verifiedOnly || m.verified),
-      ).length,
-    [draft, state.members, state.blockedIds],
-  );
-
   return (
     <BottomSheet onDismiss={() => router.back()}>
       <View style={styles.head}>
         <Text style={styles.title}>Filters</Text>
-        <Pressable onPress={() => setDraft(DEFAULTS)} hitSlop={10}>
+        <Pressable onPress={() => setDraft(DEFAULT_FILTERS)} hitSlop={10}>
           <Text style={t.link}>Reset</Text>
         </Pressable>
       </View>
@@ -78,16 +72,12 @@ export default function FiltersSheet() {
 
       <View style={styles.verified}>
         <Text style={[t.label, { fontSize: s(16.5) }]}>Verified profiles only</Text>
-        <Toggle
-          label="Verified profiles only"
-          value={draft.verifiedOnly}
-          onChange={(v) => setDraft((d) => ({ ...d, verifiedOnly: v }))}
-        />
+        <Toggle label="Verified profiles only" value={draft.verifiedOnly} onChange={(v) => setDraft((d) => ({ ...d, verifiedOnly: v }))} />
       </View>
 
       <PrimaryButton
         style={{ marginTop: s(22) }}
-        label={`Show ${count} result${count === 1 ? '' : 's'}`}
+        label={isFetching && !preview ? 'Show results' : `Show ${count} result${count === 1 ? '' : 's'} nearby`}
         onPress={() => {
           actions.applyFilters(draft);
           router.back();

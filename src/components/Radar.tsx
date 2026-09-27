@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { Member } from '../data/sample';
+import { DistanceLike } from '../api/types';
 import { formatDistance } from '../services/location';
 import { BORDER, colors, fonts, s } from '../theme/tokens';
 import { Hatched } from './Hatched';
 import { ShadowBox } from './ShadowBox';
 
 type Props = {
-  members: Member[];
+  members: DistanceLike[];
   maxKm: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -21,8 +21,7 @@ const AVATAR = s(46);
  * purpose: only the ring (distance) means anything, so the radar can
  * never reveal which direction someone is in.
  */
-function angleFor(m: Member) {
-  if (typeof m.radarAngleDeg === 'number') return (m.radarAngleDeg * Math.PI) / 180;
+function angleFor(m: DistanceLike) {
   let h = 0;
   for (let i = 0; i < m.id.length; i++) h = (h * 31 + m.id.charCodeAt(i)) >>> 0;
   return ((h % 360) * Math.PI) / 180;
@@ -56,7 +55,8 @@ export function Radar({ members, maxKm, selectedId, onSelect }: Props) {
 
           {members.map((m) => {
             const a = angleFor(m);
-            const r = inner + Math.min(m.distanceKm / Math.max(maxKm, 0.5), 1) * (outer - inner);
+            const d = m.distance_km ?? maxKm;
+            const r = inner + Math.min(d / Math.max(maxKm, 0.5), 1) * (outer - inner);
             const x = Math.min(Math.max(cx + Math.cos(a) * r, AVATAR / 2 + s(6)), size.w - AVATAR / 2 - s(10));
             const y = Math.min(Math.max(cy + Math.sin(a) * r, AVATAR / 2 + s(30)), size.h - AVATAR / 2 - s(12));
             const selected = m.id === selectedId;
@@ -64,14 +64,14 @@ export function Radar({ members, maxKm, selectedId, onSelect }: Props) {
               <Pressable
                 key={m.id}
                 accessibilityRole="button"
-                accessibilityLabel={`${m.name}, ${formatDistance(m.distanceKm, m.sharesExactDistance)} away`}
+                accessibilityLabel={`${m.full_name}, ${formatDistance(d, m.distance_precise)} away`}
                 onPress={() => onSelect(m.id)}
                 hitSlop={6}
                 style={[styles.pin, { left: x - AVATAR / 2, top: y - AVATAR / 2 - s(26) }]}
               >
                 <View style={[styles.label, selected && { backgroundColor: colors.green }]}>
                   <Text style={[styles.labelText, selected && { color: colors.ink }]}>
-                    {formatDistance(m.distanceKm, m.sharesExactDistance)}
+                    {formatDistance(d, m.distance_precise)}
                   </Text>
                 </View>
                 <ShadowBox radius={s(14)} offset={{ x: s(4), y: s(5) }}>

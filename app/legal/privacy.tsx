@@ -31,7 +31,7 @@ export default function Privacy() {
         },
         {
           title: 'Contact us',
-          body: 'Questions about your data? Reach us at privacy@vyaparhood.in',
+          body: 'Questions about your data? Reach us at privacy@vyaparhood.com',
         },
       ]}
     />

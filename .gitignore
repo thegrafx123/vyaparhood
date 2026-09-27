@@ -7,3 +7,11 @@ web-build/
 .env.*
 ios/
 android/
+
+# Environment files (keys)
+.env
+.env.*
+!.env.example
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/

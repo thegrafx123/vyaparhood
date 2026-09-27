@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '../../src/components/Buttons';
 import { Chip, TextField } from '../../src/components/Controls';
 import { Heading } from '../../src/components/Heading';
 import { Star } from '../../src/components/icons';
 import { Footer, HeaderRow, KeyboardArea, Screen } from '../../src/components/Layout';
-import { getMember, relationWith, useApp } from '../../src/state/AppStore';
+import { friendlyError } from '../../src/api/errors';
+import { useMember, useMyRating, useRate } from '../../src/api/hooks';
 import { colors, H_PAD, s } from '../../src/theme/tokens';
 import { type as t } from '../../src/theme/typography';
 import { firstName } from '../../src/utils/validation';
@@ -17,22 +18,36 @@ const TAGS = ['Professional', 'Great conversation', 'On time', 'Would recommend'
 export default function RateMeetup() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, actions } = useApp();
-  const member = getMember(state, String(id));
-  const existing = state.ratings.find((r) => r.memberId === String(id));
-  const [stars, setStars] = useState(existing?.stars ?? 0);
-  const [tags, setTags] = useState<string[]>(existing?.tags ?? []);
-  const [note, setNote] = useState(existing?.note ?? '');
+  const { data: member } = useMember(String(id));
+  const { data: existing } = useMyRating(String(id));
+  const rate = useRate();
+  const [stars, setStars] = useState(0);
+  const [tags, setTags] = useState<string[]>([]);
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (existing) {
+      setStars(existing.stars);
+      setTags(existing.tags);
+      setNote(existing.note);
+    }
+  }, [existing]);
 
   if (!member) return null;
-  const first = firstName(member.name);
-  const canRate = relationWith(state, member.id).status === 'connected';
+  const first = firstName(member.full_name);
+  const canRate = member.relation === 'connected';
 
-  const submit = () => {
-    actions.addRating({ memberId: member.id, stars, tags, note: note.trim() });
-    Alert.alert('Rating saved', `Thanks — this helps everyone who meets ${first} after you.`);
-    router.back();
-  };
+  const submit = () =>
+    rate.mutate(
+      { memberId: member.id, rating: { stars, tags, note: note.trim() } },
+      {
+        onSuccess: () => {
+          Alert.alert('Rating saved', `Thanks — this helps everyone who meets ${first} after you.`);
+          router.back();
+        },
+        onError: (e) => Alert.alert("Couldn't save rating", friendlyError(e)),
+      },
+    );
 
   return (
     <Screen>
@@ -87,7 +102,7 @@ export default function RateMeetup() {
           )}
         </ScrollView>
         <Footer>
-          <PrimaryButton label="Submit rating" onPress={submit} disabled={stars === 0 || !canRate} />
+          <PrimaryButton label="Submit rating" onPress={submit} disabled={stars === 0 || !canRate} loading={rate.isPending} />
         </Footer>
       </KeyboardArea>
     </Screen>

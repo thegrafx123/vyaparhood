@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { isActiveMember } from '../src/api/types';
 import { PrimaryButton } from '../src/components/Buttons';
 import { Heading } from '../src/components/Heading';
 import { ArrowRight, Check } from '../src/components/icons';
 import { BackButton, Blob, Footer, Screen } from '../src/components/Layout';
 import { DEFAULT_OFFER, payments, rupees } from '../src/services/payments';
-import { useApp } from '../src/state/AppStore';
+import { useAuth } from '../src/state/AuthProvider';
 import { BORDER, colors, fonts, H_PAD, s } from '../src/theme/tokens';
 import { type as t } from '../src/theme/typography';
 
@@ -22,20 +23,35 @@ const BENEFITS = [
  */
 export default function Paywall() {
   const router = useRouter();
-  const { actions } = useApp();
+  const { me, refreshMe } = useAuth();
   const offer = DEFAULT_OFFER;
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  // Root/admin accounts (and anyone an admin activates) skip the paywall.
+  useEffect(() => {
+    if (isActiveMember(me)) router.replace('/discover');
+  }, [me, router]);
 
   const start = async () => {
     setBusy(true);
     const result = await payments.purchase(offer.id);
     setBusy(false);
     if (result.status === 'success') {
-      actions.patch({ entitlement: result.entitlement });
-      router.replace('/discover');
+      // Membership is switched on server-side; re-read it.
+      const fresh = await refreshMe();
+      if (isActiveMember(fresh)) router.replace('/discover');
     } else if (result.status === 'error') {
-      Alert.alert('Payment failed', result.message);
+      Alert.alert('Membership', result.message);
     }
+  };
+
+  const checkAgain = async () => {
+    setChecking(true);
+    const fresh = await refreshMe().catch(() => null);
+    setChecking(false);
+    if (isActiveMember(fresh)) router.replace('/discover');
+    else Alert.alert('Not active yet', "Your membership isn't active yet.");
   };
 
   return (
@@ -105,6 +121,9 @@ export default function Paywall() {
           {rupees(offer.introPrice)} charged today for {offer.introPeriod} one. {rupees(offer.price)}/{offer.period} billed
           automatically after — cancel anytime in Settings.
         </Text>
+        <Pressable onPress={checkAgain} disabled={checking} style={{ alignSelf: 'center', marginTop: s(8) }} hitSlop={8}>
+          <Text style={[t.link, { fontSize: s(14.5) }]}>{checking ? 'Checking…' : 'Already activated? Check again'}</Text>
+        </Pressable>
       </Footer>
     </Screen>
   );

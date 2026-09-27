@@ -11,13 +11,18 @@
       "supportsTablet": false,
       "bundleIdentifier": "in.vyaparhood.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We use this to show you what's happening in your own city from the moment you open the app — nearby members, local requests, real distances."
+        "NSLocationWhenInUseUsageDescription": "We use this to show you what's happening in your own city from the moment you open the app \u2014 nearby members, local requests, real distances."
       }
     },
     "android": {
       "package": "in.vyaparhood.app",
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
-      "blockedPermissions": ["ACCESS_BACKGROUND_LOCATION"]
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -25,7 +30,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "We use this to show you what's happening in your own city from the moment you open the app — nearby members, local requests, real distances.",
+          "locationWhenInUsePermission": "We use this to show you what's happening in your own city from the moment you open the app \u2014 nearby members, local requests, real distances.",
           "isAndroidBackgroundLocationEnabled": false,
           "isIosBackgroundLocationEnabled": false
         }
@@ -37,7 +42,16 @@
           "cameraPermission": false,
           "microphonePermission": false
         }
-      ]
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "organization": "REPLACE_WITH_SENTRY_ORG",
+          "project": "vyaparhood"
+        }
+      ],
+      "expo-secure-store"
     ]
   }
 }

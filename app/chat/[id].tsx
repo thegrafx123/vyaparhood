@@ -1,11 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as api from '../../src/api';
+import { friendlyError } from '../../src/api/errors';
+import { keys, useChats, useMessages, useSendMessage } from '../../src/api/hooks';
+import { MemberAvatar } from '../../src/components/MemberAvatar';
+import { useAuth } from '../../src/state/AuthProvider';
+import { shortTime } from '../../src/utils/time';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar } from '../../src/components/Hatched';
 import { Send, Star } from '../../src/components/icons';
 import { BackButton, KeyboardArea, Screen } from '../../src/components/Layout';
-import { getMember, useApp } from '../../src/state/AppStore';
 import { BORDER, colors, fonts, s } from '../../src/theme/tokens';
 import { type as t } from '../../src/theme/typography';
 
@@ -14,23 +19,38 @@ export default function ChatThread() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, actions } = useApp();
-  const chat = state.chats.find((c) => c.id === String(id));
-  const member = chat ? getMember(state, chat.memberId) : undefined;
+  const connectionId = String(id);
+  const qc = useQueryClient();
+  const { userId } = useAuth();
+  const { data: chats, isLoading: chatsLoading } = useChats();
+  const chat = chats?.find((c) => c.connection_id === connectionId);
+  const { data: messages = [], isLoading } = useMessages(connectionId);
+  const sendMessage = useSendMessage(connectionId);
   const [text, setText] = useState('');
   const scroll = useRef<ScrollView>(null);
 
+  // Mark as read on open and whenever a new message arrives while open.
+  const lastId = messages[messages.length - 1]?.id;
   useEffect(() => {
-    if (chat?.unread) actions.markChatRead(chat.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chat?.id]);
+    api.chat
+      .markRead(connectionId)
+      .then(() => {
+        qc.invalidateQueries({ queryKey: keys.chats });
+        qc.invalidateQueries({ queryKey: keys.notifications });
+      })
+      .catch(() => {});
+  }, [connectionId, lastId, qc]);
 
-  if (!chat || !member) {
+  if (!chat) {
     return (
       <Screen>
         <View style={{ padding: s(20) }}>
           <BackButton />
-          <Text style={[t.bodyInk, { marginTop: s(20) }]}>This conversation isn't available.</Text>
+          {chatsLoading ? (
+            <ActivityIndicator style={{ marginTop: s(40) }} color={colors.blue} />
+          ) : (
+            <Text style={[t.bodyInk, { marginTop: s(20) }]}>This conversation isn't available.</Text>
+          )}
         </View>
       </Screen>
     );
@@ -38,9 +58,14 @@ export default function ChatThread() {
 
   const send = () => {
     const v = text.trim();
-    if (!v) return;
-    actions.sendMessage(chat.id, v);
+    if (!v || sendMessage.isPending) return;
     setText('');
+    sendMessage.mutate(v, {
+      onError: (e) => {
+        setText(v);
+        Alert.alert("Message not sent", friendlyError(e));
+      },
+    });
   };
 
   return (
@@ -48,19 +73,17 @@ export default function ChatThread() {
       <KeyboardArea>
         <View style={styles.header}>
           <BackButton />
-          <Pressable style={styles.who} onPress={() => router.push(`/member/${member.id}`)}>
-            <Avatar size={s(42)} radius={s(13)} online={chat.online} />
+          <Pressable style={styles.who} onPress={() => router.push(`/member/${chat.member_id}`)}>
+            <MemberAvatar path={chat.member_photo} size={s(42)} radius={s(13)} />
             <View style={{ marginLeft: s(12) }}>
-              <Text style={t.name}>{member.name}</Text>
-              <Text style={[styles.status, !chat.online && { color: colors.textMuted }]}>
-                {chat.online ? 'Online' : 'Offline'}
-              </Text>
+              <Text style={t.name}>{chat.member_name}</Text>
+              <Text style={[styles.status, { color: colors.textMuted }]}>View profile</Text>
             </View>
           </Pressable>
           <Pressable
             style={styles.star}
-            onPress={() => router.push(`/rate/${member.id}`)}
-            accessibilityLabel={`Rate your meetup with ${member.name}`}
+            onPress={() => router.push(`/rate/${chat.member_id}`)}
+            accessibilityLabel={`Rate your meetup with ${chat.member_name}`}
           >
             <Star size={s(19)} color={colors.ink} fill={colors.star} strokeWidth={1.8} />
           </Pressable>
@@ -73,20 +96,23 @@ export default function ChatThread() {
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}
           keyboardShouldPersistTaps="handled"
         >
-          {chat.messages.map((m) =>
-            m.from === 'system' ? (
-              <View key={m.id} style={styles.system}>
-                <Text style={styles.systemText}>{m.text}</Text>
-              </View>
-            ) : (
-              <View key={m.id} style={{ alignItems: m.from === 'me' ? 'flex-end' : 'flex-start' }}>
-                <View style={[styles.bubble, m.from === 'me' ? styles.mine : styles.theirs]}>
-                  <Text style={[styles.msg, m.from === 'me' && { color: colors.white }]}>{m.text}</Text>
+          <View style={styles.system}>
+            <Text style={styles.systemText}>Connection approved · You can chat now</Text>
+          </View>
+          {isLoading && <ActivityIndicator color={colors.blue} />}
+          {messages.map((m, i) => {
+            const mine = m.sender_id === userId;
+            const last = i === messages.length - 1;
+            return (
+              <View key={m.id} style={{ alignItems: mine ? 'flex-end' : 'flex-start' }}>
+                <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+                  <Text style={[styles.msg, mine && { color: colors.white }]}>{m.body}</Text>
                 </View>
-                {m.time ? <Text style={styles.time}>{m.time}</Text> : null}
+                {last ? <Text style={styles.time}>{shortTime(m.created_at)}</Text> : null}
               </View>
-            ),
-          )}
+            );
+          })}
+          {chat.blocked && <Text style={[styles.systemText, { textAlign: 'center' }]}>You can't message this member.</Text>}
         </ScrollView>
 
         <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, s(10)) + s(4) }]}>
@@ -94,6 +120,7 @@ export default function ChatThread() {
             value={text}
             onChangeText={setText}
             placeholder="Type a message..."
+            editable={!chat.blocked}
             placeholderTextColor={colors.placeholder}
             style={styles.input}
             multiline

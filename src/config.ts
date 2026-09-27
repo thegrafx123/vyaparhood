@@ -60,8 +60,10 @@ export const categoryLabel = (id: CategoryId) =>
   CATEGORIES.find((c) => c.id === id)?.label ?? id;
 
 /** OTP length shown in the verify screen. The design uses 4; 6 is safer once the backend exists. */
-export const OTP_LENGTH = 4;
-export const OTP_RESEND_SECONDS = 30;
+/** Email OTP length. Must match Supabase → Auth → Email OTP length (default 6). */
+export const OTP_LENGTH = 6;
+/** Supabase allows one code per email every 60 seconds by default. */
+export const OTP_RESEND_SECONDS = 60;
 
 
 /** Verification documents. Flip to true when business proof becomes mandatory. */
@@ -75,4 +77,4 @@ export const DISTANCE_MIN_KM = 0.5;
 export const DISTANCE_MAX_KM = 20;
 export const DEFAULT_DISTANCE_KM = 4.5;
 
-export const SUPPORT_EMAIL = 'support@vyaparhood.in';
+export const SUPPORT_EMAIL = 'support@vyaparhood.com';

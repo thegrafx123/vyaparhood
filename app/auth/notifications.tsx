@@ -3,7 +3,8 @@ import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LogoMark, Screen } from '../../src/components/Layout';
 import { requestNotificationPermission } from '../../src/services/notifications';
-import { useApp } from '../../src/state/AppStore';
+import { routeForMe } from '../../src/lib/routing';
+import { useAuth } from '../../src/state/AuthProvider';
 import { colors, fonts, H_PAD, s } from '../../src/theme/tokens';
 
 /**
@@ -12,17 +13,16 @@ import { colors, fonts, H_PAD, s } from '../../src/theme/tokens';
  */
 export default function NotificationsPermission() {
   const router = useRouter();
-  const { actions } = useApp();
+  const { refreshMe } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       await new Promise((r) => setTimeout(r, 500));
-      const allowed = await requestNotificationPermission();
+      await requestNotificationPermission(); // push tokens are registered in a later release
+      const me = await refreshMe().catch(() => null);
       if (cancelled) return;
-      actions.patch({ notificationsAllowed: allowed });
-      actions.setSettings({ notifyRequests: allowed, notifyMessages: allowed });
-      router.replace('/paywall');
+      router.replace(routeForMe(me) as never);
     })();
     return () => {
       cancelled = true;

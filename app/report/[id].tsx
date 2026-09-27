@@ -4,24 +4,27 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { OutlineButton, PrimaryButton } from '../../src/components/Buttons';
 import { Radio, TextField } from '../../src/components/Controls';
 import { Divider, HeaderRow, KeyboardArea, Screen, SoftCard } from '../../src/components/Layout';
-import { getMember, useApp } from '../../src/state/AppStore';
+import { friendlyError } from '../../src/api/errors';
+import { useBlock, useMember, useReport } from '../../src/api/hooks';
+import { ReportReason } from '../../src/api/types';
 import { colors, fonts, H_PAD, s } from '../../src/theme/tokens';
 import { type as t } from '../../src/theme/typography';
 
-const REASONS = [
-  'Fake profile or scam',
-  'Inappropriate messages',
-  'Spam or solicitation',
-  'Harassment or abuse',
-  'Something else',
+const REASONS: { id: ReportReason; label: string }[] = [
+  { id: 'fake', label: 'Fake profile or scam' },
+  { id: 'inappropriate', label: 'Inappropriate messages' },
+  { id: 'spam', label: 'Spam or solicitation' },
+  { id: 'harassment', label: 'Harassment or abuse' },
+  { id: 'other', label: 'Something else' },
 ];
 
 /** 25 · Report or block. */
 export default function ReportOrBlock() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, actions } = useApp();
-  const member = getMember(state, String(id));
+  const { data: member } = useMember(String(id));
+  const report = useReport();
+  const blockMember = useBlock();
   const [reason, setReason] = useState(0);
   const [details, setDetails] = useState('');
 
@@ -32,26 +35,32 @@ export default function ReportOrBlock() {
     router.navigate('/discover');
   };
 
-  const submit = () => {
-    // Backend later: POST /reports { member_id, reason, details } → safety queue
-    Alert.alert('Report submitted', 'Our safety team will review it within 24 hours. Thank you for flagging it.', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
-  };
+  const submit = () =>
+    report.mutate(
+      { memberId: member.id, reason: REASONS[reason].id, details: details.trim() },
+      {
+        onSuccess: () =>
+          Alert.alert('Report submitted', 'Our safety team will review it within 24 hours. Thank you for flagging it.', [
+            { text: 'OK', onPress: () => router.back() },
+          ]),
+        onError: (e) => Alert.alert("Couldn't submit", friendlyError(e)),
+      },
+    );
 
   const block = () =>
     Alert.alert(
-      `Block ${member.name}?`,
+      `Block ${member.full_name}?`,
       "They won't be able to see you or message you, and they'll be removed from your Discover feed and chats.",
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Block',
           style: 'destructive',
-          onPress: () => {
-            actions.blockMember(member.id);
-            leaveToDiscover();
-          },
+          onPress: () =>
+            blockMember.mutate(member.id, {
+              onSuccess: leaveToDiscover,
+              onError: (e) => Alert.alert("Couldn't block", friendlyError(e)),
+            }),
         },
       ],
     );
@@ -67,7 +76,7 @@ export default function ReportOrBlock() {
 
           <SoftCard radius={s(26)} style={{ marginTop: s(20) }} innerStyle={{ paddingHorizontal: s(20), paddingVertical: s(4) }}>
             {REASONS.map((r, i) => (
-              <View key={r}>
+              <View key={r.id}>
                 {i > 0 && <Divider />}
                 <Pressable
                   style={styles.row}
@@ -76,7 +85,7 @@ export default function ReportOrBlock() {
                   accessibilityState={{ selected: reason === i }}
                 >
                   <Radio selected={reason === i} />
-                  <Text style={styles.reason}>{r}</Text>
+                  <Text style={styles.reason}>{r.label}</Text>
                 </Pressable>
               </View>
             ))}
@@ -94,7 +103,7 @@ export default function ReportOrBlock() {
             maxLength={1000}
           />
 
-          <PrimaryButton style={{ marginTop: s(24) }} label="Submit report" circle="none" onPress={submit} />
+          <PrimaryButton style={{ marginTop: s(24) }} label="Submit report" circle="none" onPress={submit} loading={report.isPending} />
           <OutlineButton
             style={{ marginTop: s(16) }}
             height={s(58)}

@@ -38,7 +38,7 @@ export default function NotAnotherApp() {
       heading={['Not another', { accent: 'networking', squiggle: 'ink' }, 'app']}
       subtitle="Here's what makes finding the right people simple."
       cta="Let's Go"
-      onNext={() => router.push('/auth/phone')}
+      onNext={() => router.push('/auth/email')}
       background={<Blob color={colors.blobLime} size={s(250)} top={-s(80)} right={-s(60)} />}
     >
       <View style={styles.timeline}>

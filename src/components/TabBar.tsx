@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useApp } from '../state/AppStore';
+import { useRequests } from '../api/hooks';
 import { BORDER, colors, fonts, s } from '../theme/tokens';
 import { CircleUserRound, Compass, Inbox, MessageSquare } from './icons';
 
@@ -21,8 +21,8 @@ type TabBarProps = {
 
 export function TabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
-  const { state: app } = useApp();
-  const incoming = app.requests.filter((r) => r.direction === 'incoming').length;
+  const { data: requests } = useRequests();
+  const incoming = (requests ?? []).filter((r) => r.direction === 'incoming').length;
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, s(10)) }]}>
