@@ -43,7 +43,16 @@ export function checkDob(v: string, minAge = 18): DobCheck {
   return { ok: true, age };
 }
 
-export const firstName = (full: string) => full.trim().split(/\s+/)[0] ?? full;
+/** Latest and earliest birth dates checkDob accepts, for the date picker. */
+export function dobBounds(minAge = 18, maxAge = 110) {
+  const now = new Date();
+  return {
+    max: new Date(now.getFullYear() - minAge, now.getMonth(), now.getDate()),
+    min: new Date(now.getFullYear() - maxAge, now.getMonth(), now.getDate()),
+  };
+}
+
+export const firstName =(full: string) => full.trim().split(/\s+/)[0] ?? full;
 
 export const nowTime = () => {
   const d = new Date();

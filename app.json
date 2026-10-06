@@ -11,7 +11,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "in.vyaparhood.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We use this to show you what's happening in your own city from the moment you open the app \u2014 nearby members, local requests, real distances."
+        "NSLocationWhenInUseUsageDescription": "We use this to show you what's happening in your own city from the moment you open the app — nearby members, local requests, real distances."
       }
     },
     "android": {
@@ -30,7 +30,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "We use this to show you what's happening in your own city from the moment you open the app \u2014 nearby members, local requests, real distances.",
+          "locationWhenInUsePermission": "We use this to show you what's happening in your own city from the moment you open the app — nearby members, local requests, real distances.",
           "isAndroidBackgroundLocationEnabled": false,
           "isIosBackgroundLocationEnabled": false
         }
@@ -51,7 +51,8 @@
           "project": "vyaparhood"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

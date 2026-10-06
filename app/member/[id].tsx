@@ -1,204 +1,285 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { ActionSheetIOS, ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { friendlyError } from '../../src/api/errors';
-import { useMember, useSetSaved, useSignedUrl } from '../../src/api/hooks';
-import { PrimaryButton } from '../../src/components/Buttons';
-import { Tag } from '../../src/components/Controls';
-import { Hatched, VerifiedBadge } from '../../src/components/Hatched';
-import { Ellipsis, MapPin, Star } from '../../src/components/icons';
-import { BackButton, Divider, Footer, Screen } from '../../src/components/Layout';
-import { ShadowBox } from '../../src/components/ShadowBox';
+import { useMember, useRespondRequest, useSetSaved, useWithdrawRequest } from '../../src/api/hooks';
+import { MemberDetail } from '../../src/api/types';
+import { categoryLabel } from '../../src/config';
+import { FadeUp, PressScale } from '../../src/motion';
 import { formatDistance } from '../../src/services/location';
-import { BORDER, colors, fonts, H_PAD, s } from '../../src/theme/tokens';
+import { colors, fonts, s } from '../../src/theme/tokens';
 import { type as t } from '../../src/theme/typography';
+import { MemberPhoto, VerifiedTick } from '../../src/ui/Avatar';
+import { CtaButton, PillButton } from '../../src/ui/Buttons';
+import { Empty, Loading } from '../../src/ui/Cards';
+import { Tag } from '../../src/ui/Form';
+import { BackButton } from '../../src/ui/Header';
+import { Bookmark, Dots, Pin } from '../../src/ui/icons';
+import { Blob, DotTexture, Screen } from '../../src/ui/Screen';
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** "Mar '24", as in the design. */
 const monthYear = (iso: string) => {
   const d = new Date(iso);
-  return `${d.toLocaleString('en-IN', { month: 'short' })} '${String(d.getFullYear()).slice(2)}`;
+  return `${MONTHS[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
 };
 
-/** 19 · Member profile (get_member RPC — no private fields ever leave the server). */
+/** 17 · Member profile. Only public fields — never their address or number. */
 export default function MemberProfile() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: m, isLoading, error } = useMember(String(id));
+  const { data: m, isLoading, error } = useMember(id);
   const setSaved = useSetSaved();
-  const photo = useSignedUrl('avatars', m?.photo_path);
 
-  if (isLoading || !m) {
+  if (isLoading) return <Loading style={{ backgroundColor: colors.bg }} />;
+  if (error || !m) {
     return (
       <Screen>
-        <View style={{ padding: H_PAD }}>
+        <View style={{ paddingHorizontal: s(20), paddingTop: s(20), flexDirection: 'row' }}>
           <BackButton />
-          {isLoading ? (
-            <ActivityIndicator style={{ marginTop: s(40) }} color={colors.blue} />
-          ) : (
-            <Text style={[t.bodyInk, { marginTop: s(20) }]}>{error ? friendlyError(error) : "This profile isn't available."}</Text>
-          )}
         </View>
+        <Empty title="This profile isn't available" body={error ? friendlyError(error) : 'They may have left Vyaparhood.'} />
       </Screen>
     );
   }
 
-  const openMore = () => {
-    const saveLabel = m.is_saved ? 'Remove from saved' : 'Save profile';
-    const run = (i: number) => {
-      if (i === 0) setSaved.mutate({ memberId: m.id, save: !m.is_saved });
-      if (i === 1) router.push(`/report/${m.id}`);
-    };
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: [saveLabel, 'Report or block', 'Cancel'], destructiveButtonIndex: 1, cancelButtonIndex: 2 },
-        run,
-      );
-    } else {
-      Alert.alert(m.full_name, undefined, [
-        { text: saveLabel, onPress: () => run(0) },
-        { text: 'Report or block', style: 'destructive', onPress: () => run(1) },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    }
-  };
-
-  const cta = (() => {
-    switch (m.relation) {
-      case 'connected':
-        return { label: 'Message', onPress: () => router.push(`/chat/${m.connection_id}`), disabled: false };
-      case 'outgoing':
-        return { label: 'Request sent', onPress: () => {}, disabled: true };
-      case 'incoming':
-        return { label: 'Respond to request', onPress: () => router.push('/requests'), disabled: false };
-      case 'blocked':
-        return { label: 'Blocked', onPress: () => {}, disabled: true };
-      default:
-        return { label: 'Send request', onPress: () => router.push(`/send-request/${m.id}`), disabled: false };
-    }
-  })();
+  const distance = formatDistance(m.distance_km, m.distance_precise);
+  const where = [[m.area, m.city].filter(Boolean).join(', '), distance ? `${distance} away` : null].filter(Boolean).join(' · ');
 
   return (
     <Screen padTop={false}>
-      <ScrollView contentContainerStyle={{ paddingBottom: s(20) }}>
-        <Hatched radius={0} iconSize={s(30)} style={[styles.cover, { height: s(190) + insets.top }]} />
-        <View style={[styles.topButtons, { top: insets.top + s(8) }]}>
-          <BackButton bg={colors.white} />
-          <Pressable style={styles.more} onPress={openMore} accessibilityLabel="More options" hitSlop={8}>
-            <Ellipsis size={s(20)} color={colors.ink} strokeWidth={2.4} />
-          </Pressable>
-        </View>
-        <ShadowBox radius={s(22)} color={colors.shadowSoft} offset={{ x: s(3), y: s(4) }} style={styles.avatarWrap}>
-          {photo ? (
-            <Image source={{ uri: photo }} style={[styles.avatar, { borderRadius: s(22) }]} />
-          ) : (
-            <Hatched radius={s(22)} dashed={false} iconSize={s(24)} style={styles.avatar} />
-          )}
-        </ShadowBox>
-
-        <View style={styles.body}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={styles.name}>{m.full_name}</Text>
-            {m.verified && (
-              <View style={{ marginLeft: s(8) }}>
-                <VerifiedBadge size={s(22)} />
-              </View>
-            )}
+      <ScrollView contentContainerStyle={{ paddingBottom: s(130) }} showsVerticalScrollIndicator={false}>
+        {/* Cover banner scrolls with the page so the photo can overlap it. */}
+        <FadeUp delay={20}>
+          <View style={{ height: s(210) + insets.top, backgroundColor: colors.blueSoft, overflow: 'hidden' }}>
+            <DotTexture />
+            <Blob color={colors.lime} size={s(200)} opacity={0.7} rotate="18deg" style={{ right: -s(60), top: -s(40) }} />
+            <Blob color={colors.blue} size={s(140)} opacity={0.12} style={{ left: -s(40), bottom: -s(50) }} />
           </View>
-          <Text style={styles.role}>{m.headline}</Text>
-          <View style={styles.locRow}>
-            <MapPin size={s(15)} color={colors.textMuted} strokeWidth={2} />
-            <Text style={styles.loc}>
-              {[m.area, m.city].filter(Boolean).join(', ')}
-              {m.distance_km != null ? ` · ${formatDistance(m.distance_km, m.distance_precise)} away` : ''}
+        </FadeUp>
+
+        <View style={{ paddingHorizontal: s(24) }}>
+          <FadeUp delay={100} style={{ marginTop: -s(36), flexDirection: 'row' }}>
+            <View style={{ borderRadius: s(24), borderWidth: s(3.5), borderColor: colors.bg }}>
+              <MemberPhoto path={m.photo_path} size={s(92)} radius={s(21)} />
+            </View>
+          </FadeUp>
+
+          <FadeUp delay={160} style={{ marginTop: s(12), flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
+            <Text style={{ fontFamily: fonts.display, fontSize: s(22), color: colors.ink, flexShrink: 1 }} accessibilityRole="header">
+              {m.full_name}
             </Text>
-          </View>
-
-          <Divider style={{ marginTop: s(18) }} />
-          <View style={styles.stats}>
-            <Stat value={String(m.connections)} label="Connections" />
-            <Stat value={monthYear(m.member_since)} label="Member since" />
-            <Stat
-              value={m.rating != null ? Number(m.rating).toFixed(1) : 'New'}
-              label="Community rating"
-              icon={m.rating != null ? <Star size={s(17)} color={colors.ink} fill={colors.ink} /> : undefined}
-            />
-          </View>
-          <Divider />
-
-          {m.bio ? (
-            <>
-              <Text style={[t.label, { marginTop: s(20) }]}>About</Text>
-              <Text style={[t.body, { fontSize: s(16.5), lineHeight: s(25), marginTop: s(6) }]}>{m.bio}</Text>
-            </>
+            {m.verified && <VerifiedTick size={s(18)} />}
+          </FadeUp>
+          <FadeUp delay={200}>
+            <Text style={{ fontFamily: fonts.bodySemi, fontSize: s(14), color: colors.text, marginTop: s(3) }}>{m.headline}</Text>
+          </FadeUp>
+          {where ? (
+            <FadeUp delay={240} style={{ flexDirection: 'row', alignItems: 'center', gap: s(4), marginTop: s(6) }}>
+              <Pin size={s(12)} color={colors.muted} />
+              <Text style={{ fontFamily: fonts.body, fontSize: s(12.5), color: colors.muted }}>{where}</Text>
+            </FadeUp>
           ) : null}
 
-          {m.offers.length > 0 && (
-            <>
-              <Text style={[t.label, { marginTop: s(18), marginBottom: s(10) }]}>Offers</Text>
-              <View style={styles.tags}>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: s(20),
+              marginTop: s(18),
+              paddingVertical: s(16),
+              borderTopWidth: s(2),
+              borderBottomWidth: s(2),
+              borderColor: colors.line,
+            }}
+          >
+            <Stat delay={300} value={String(m.connections)} label="Connections" />
+            <Stat delay={360} value={monthYear(m.member_since)} label="Member since" />
+            <Stat delay={420} value={m.rating ? `${m.rating} ★` : 'New'} label="Community rating" />
+          </View>
+
+          {m.bio ? (
+            <Section delay={500} title="About">
+              <Text style={[t.body, { lineHeight: s(21.6) }]}>{m.bio}</Text>
+            </Section>
+          ) : null}
+
+          {m.category ? (
+            <Section delay={540} title="Category">
+              <Tag label={categoryLabel(m.category)} tone="teal" outlined />
+            </Section>
+          ) : null}
+
+          {m.offers.length ? (
+            <Section delay={580} title="Offers">
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(8) }}>
                 {m.offers.map((o) => (
-                  <Tag key={o} label={o} tone="teal" style={styles.bigTag} />
+                  <Tag key={o} label={o} tone="teal" />
                 ))}
               </View>
-            </>
-          )}
-          {m.looking_for.length > 0 && (
-            <>
-              <Text style={[t.label, { marginTop: s(16), marginBottom: s(10) }]}>Looking for</Text>
-              <View style={styles.tags}>
+            </Section>
+          ) : null}
+
+          {m.looking_for.length ? (
+            <Section delay={660} title="Looking for">
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(8) }}>
                 {m.looking_for.map((o) => (
-                  <Tag key={o} label={o} tone="blue" style={styles.bigTag} />
+                  <Tag key={o} label={o} tone="blue" />
                 ))}
               </View>
-            </>
-          )}
+            </Section>
+          ) : null}
+
+          {m.social_handle ? (
+            <Section delay={700} title="Instagram / LinkedIn">
+              <Text style={{ fontFamily: fonts.bodyBold, fontSize: s(13.5), color: colors.blue }}>@{m.social_handle}</Text>
+            </Section>
+          ) : null}
         </View>
       </ScrollView>
-      <Footer style={styles.footer}>
-        <PrimaryButton label={cta.label} onPress={cta.onPress} disabled={cta.disabled} />
-      </Footer>
+
+      {/* Buttons stay on top while the page scrolls. */}
+      <FadeUp
+        delay={20}
+        style={{
+          position: 'absolute',
+          top: insets.top + s(20),
+          left: s(20),
+          right: s(20),
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+        }}
+      >
+        <BackButton />
+        <View style={{ flexDirection: 'row', gap: s(10) }}>
+          <RoundIcon
+            label={m.is_saved ? 'Remove from saved' : 'Save profile'}
+            onPress={() => setSaved.mutate({ memberId: m.id, save: !m.is_saved })}
+          >
+            <Bookmark size={s(16)} color={colors.ink} fill={m.is_saved ? colors.lime : 'none'} />
+          </RoundIcon>
+          <RoundIcon label="Report or block" onPress={() => router.push(`/report/${m.id}`)}>
+            <Dots size={s(16)} color={colors.ink} />
+          </RoundIcon>
+        </View>
+      </FadeUp>
+
+      <FadeUp
+        delay={750}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.bg,
+          borderTopWidth: s(2.5),
+          borderTopColor: colors.ink,
+          paddingHorizontal: s(24),
+          paddingTop: s(14),
+          paddingBottom: Math.max(insets.bottom + s(6), s(28)),
+        }}
+      >
+        <Action m={m} />
+      </FadeUp>
     </Screen>
   );
 }
 
-function Stat({ value, label, icon }: { value: string; label: string; icon?: React.ReactNode }) {
+function Action({ m }: { m: MemberDetail }) {
+  const router = useRouter();
+  const withdraw = useWithdrawRequest();
+  const respond = useRespondRequest();
+
+  switch (m.relation) {
+    case 'connected':
+      return <CtaButton label={`Message ${m.full_name.split(' ')[0]}`} icon="send" size="md" onPress={() => router.push(`/chat/${m.connection_id}`)} />;
+    case 'outgoing':
+      return (
+        <View style={{ flexDirection: 'row', gap: s(10), alignItems: 'center' }}>
+          <Text style={[t.row, { flex: 1 }]}>Request sent — waiting for them to accept.</Text>
+          <PillButton
+            label="Withdraw"
+            loading={withdraw.isPending}
+            onPress={() =>
+              m.request_id &&
+              withdraw.mutate(m.request_id, { onError: (e) => Alert.alert('Could not withdraw', friendlyError(e)) })
+            }
+          />
+        </View>
+      );
+    case 'incoming':
+      return (
+        <View style={{ flexDirection: 'row', gap: s(8) }}>
+          <PillButton
+            label="Decline"
+            size="lg"
+            style={{ flex: 1 }}
+            onPress={() => m.request_id && respond.mutate({ requestId: m.request_id, accept: false })}
+          />
+          <PillButton
+            label="Accept"
+            tone="lime"
+            size="lg"
+            style={{ flex: 1 }}
+            loading={respond.isPending}
+            onPress={() =>
+              m.request_id &&
+              respond.mutate(
+                { requestId: m.request_id, accept: true },
+                {
+                  onSuccess: (conn) => conn && router.push(`/chat/${conn}`),
+                  onError: (e) => Alert.alert('Could not accept', friendlyError(e)),
+                },
+              )
+            }
+          />
+        </View>
+      );
+    case 'blocked':
+      return <Text style={[t.row, { textAlign: 'center' }]}>You've blocked this member. Unblock them in Settings.</Text>;
+    default:
+      return <CtaButton label="Send request" size="md" onPress={() => router.push(`/send-request/${m.id}`)} />;
+  }
+}
+
+function RoundIcon({ label, onPress, children }: { label: string; onPress: () => void; children: React.ReactNode }) {
   return (
-    <View style={{ marginRight: s(34) }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(4) }}>
-        <Text style={styles.statValue}>{value}</Text>
-        {icon}
-      </View>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    <PressScale
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      hitSlop={6}
+      style={{
+        width: s(40),
+        height: s(40),
+        borderRadius: s(20),
+        backgroundColor: colors.white,
+        borderWidth: s(2.5),
+        borderColor: colors.ink,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {children}
+    </PressScale>
   );
 }
 
-const AV = s(84);
-const styles = StyleSheet.create({
-  cover: { width: '100%', borderBottomWidth: BORDER, borderStyle: 'dashed', borderColor: colors.blue },
-  topButtons: { position: 'absolute', left: s(20), right: s(20), flexDirection: 'row', justifyContent: 'space-between' },
-  more: {
-    width: s(42),
-    height: s(42),
-    borderRadius: s(21),
-    borderWidth: BORDER,
-    borderColor: colors.ink,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarWrap: { marginLeft: H_PAD, marginTop: -AV / 2, width: AV, height: AV },
-  avatar: { width: AV, height: AV, borderWidth: s(3), borderColor: colors.bg },
-  body: { paddingHorizontal: H_PAD, paddingTop: s(18) },
-  name: { fontFamily: fonts.display, fontSize: s(27), color: colors.ink, lineHeight: s(34), flexShrink: 1 },
-  role: { fontFamily: fonts.bodyBold, fontSize: s(17), color: '#5F6D8A', marginTop: s(2) },
-  locRow: { flexDirection: 'row', alignItems: 'center', gap: s(6), marginTop: s(6) },
-  loc: { fontFamily: fonts.body, fontSize: s(15), color: colors.textMuted },
-  stats: { flexDirection: 'row', paddingVertical: s(16) },
-  statValue: { fontFamily: fonts.display, fontSize: s(20), color: colors.ink },
-  statLabel: { fontFamily: fonts.body, fontSize: s(14), color: colors.textMuted },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: s(10) },
-  bigTag: { height: s(34), borderRadius: s(17), paddingHorizontal: s(16) },
-  footer: { borderTopWidth: BORDER, borderTopColor: colors.ink, backgroundColor: colors.bg },
-});
+function Stat({ value, label, delay }: { value: string; label: string; delay: number }) {
+  return (
+    <FadeUp delay={delay}>
+      <Text style={{ fontFamily: fonts.display, fontSize: s(17), color: colors.ink }}>{value}</Text>
+      <Text style={{ fontFamily: fonts.body, fontSize: s(11), color: colors.muted }}>{label}</Text>
+    </FadeUp>
+  );
+}
+
+function Section({ title, delay, children }: { title: string; delay: number; children: React.ReactNode }) {
+  return (
+    <FadeUp delay={delay} style={{ marginTop: s(18) }}>
+      <Text style={[t.label, { marginBottom: s(8) }]}>{title}</Text>
+      {children}
+    </FadeUp>
+  );
+}

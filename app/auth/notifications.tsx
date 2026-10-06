@@ -1,52 +1,58 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { LogoMark, Screen } from '../../src/components/Layout';
-import { requestNotificationPermission } from '../../src/services/notifications';
+import React from 'react';
+import { View } from 'react-native';
 import { routeForMe } from '../../src/lib/routing';
+import { requestNotificationPermission } from '../../src/services/notifications';
+import { useApp } from '../../src/state/AppStore';
 import { useAuth } from '../../src/state/AuthProvider';
-import { colors, fonts, H_PAD, s } from '../../src/theme/tokens';
+import { s } from '../../src/theme/tokens';
+import { isIOS, SystemDialog } from '../../src/ui/Dialog';
+import { Brand, LogoMark } from '../../src/ui/Header';
+import { Screen } from '../../src/ui/Screen';
 
-/**
- * 14 · Notification permission. The dialog is drawn by the OS; this
- * screen is the dimmed app skeleton behind it, as in the design.
- */
-export default function NotificationsPermission() {
+/** 13 · Enable notifications — the design's dialog over a faded app preview. */
+export default function EnableNotifications() {
   const router = useRouter();
-  const { refreshMe } = useAuth();
+  const { state, actions } = useApp();
+  const { me } = useAuth();
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await new Promise((r) => setTimeout(r, 500));
-      await requestNotificationPermission(); // push tokens are registered in a later release
-      const me = await refreshMe().catch(() => null);
-      if (cancelled) return;
-      router.replace(routeForMe(me) as never);
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const finish = () => {
+    actions.setFlag('notificationsPrompted', true);
+    router.replace(routeForMe(me, { ...state.flags, notificationsPrompted: true }) as never);
+  };
+
+  const allow = async () => {
+    await requestNotificationPermission();
+    finish();
+  };
 
   return (
-    <Screen statusBar="light">
-      <View style={styles.header}>
-        <LogoMark size={s(38)} />
-        <Text style={styles.brand}>Vyaparhood</Text>
+    <Screen bg="#EDEFF4">
+      <View style={{ paddingTop: s(40), paddingHorizontal: s(26), opacity: 0.5 }}>
+        <Brand />
+        <View style={{ marginTop: s(40), height: s(14), width: '70%', backgroundColor: '#D4D9E4', borderRadius: s(5) }} />
+        <View style={{ marginTop: s(12), height: s(90), backgroundColor: '#D4D9E4', borderRadius: s(16) }} />
+        <View style={{ marginTop: s(12), height: s(90), backgroundColor: '#D4D9E4', borderRadius: s(16) }} />
       </View>
-      <View style={[styles.bar, { width: '72%', marginTop: s(34) }]} />
-      <View style={styles.block} />
-      <View style={styles.dim} pointerEvents="none" />
+      <SystemDialog
+        width={s(270)}
+        layout="row"
+        dim="rgba(15,20,35,0.42)"
+        icon={<LogoMark size={s(40)} border={0} />}
+        title={isIOS ? 'Get notified about requests & messages' : '“Vyaparhood” Would Like to Send You Notifications'}
+        message="We'll let you know about new requests, messages and connection approvals."
+        buttons={
+          isIOS
+            ? [
+                { label: 'Not now', onPress: finish },
+                { label: 'Continue', onPress: allow, bold: true, primary: true },
+              ]
+            : [
+                { label: "Don't Allow", onPress: finish },
+                { label: 'Allow', onPress: allow, bold: true, primary: true },
+              ]
+        }
+      />
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: H_PAD, paddingTop: s(18) },
-  brand: { fontFamily: fonts.display, fontSize: s(19), color: colors.ink, marginLeft: s(10), marginTop: s(3) },
-  bar: { height: s(14), borderRadius: s(7), backgroundColor: colors.divider, marginHorizontal: H_PAD },
-  block: { height: s(84), borderRadius: s(24), backgroundColor: colors.divider, margin: H_PAD, marginTop: s(10) },
-  dim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(30, 38, 60, 0.46)' },
-});

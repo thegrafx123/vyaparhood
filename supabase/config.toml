@@ -2,8 +2,9 @@
 # the CLI at the dev or prod project before `db push` / `functions deploy`.
 project_id = "vyaparhood"
 
-[functions.delete-account]
-verify_jwt = true
-
-[functions.purge-expired-documents]
+# Called by pg_cron with a shared secret, not a user login.
+[functions.purge-deleted-accounts]
 verify_jwt = false
+
+[auth.sms.test_otp]
+"+917624828905" = "123456"

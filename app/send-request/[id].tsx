@@ -1,86 +1,132 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 import { friendlyError } from '../../src/api/errors';
 import { useMember, useSendRequest } from '../../src/api/hooks';
-import { PrimaryButton } from '../../src/components/Buttons';
-import { BottomSheet } from '../../src/components/Layout';
-import { MemberAvatar } from '../../src/components/MemberAvatar';
-import { BORDER, colors, fonts, s } from '../../src/theme/tokens';
-import { firstName } from '../../src/utils/validation';
+import { FadeUp } from '../../src/motion';
+import { colors, fonts, s } from '../../src/theme/tokens';
+import { type as t } from '../../src/theme/typography';
+import { MemberPhoto } from '../../src/ui/Avatar';
+import { CtaButton } from '../../src/ui/Buttons';
+import { Loading } from '../../src/ui/Cards';
+import { Helper } from '../../src/ui/Form';
+import { BottomSheet } from '../../src/ui/Sheet';
 
-const MAX = 300;
 const MIN = 10;
+const MAX = 300;
 
-/** 20 · Send a connection request with a note. */
+/** 18 · Send request — a short note travels with every request. */
 export default function SendRequest() {
-  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: member } = useMember(String(id));
+  const router = useRouter();
+  const { data: m, isLoading } = useMember(id);
   const send = useSendRequest();
   const [note, setNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  const first = m?.full_name.split(' ')[0] ?? '';
+  const length = note.trim().length;
 
-  if (!member) return null;
-  const ok = note.trim().length >= MIN;
-
-  const onSend = () =>
+  const submit = () => {
+    if (!m || length < MIN) {
+      setError(`Write at least ${MIN} characters so they know why you're reaching out.`);
+      return;
+    }
+    setError(null);
     send.mutate(
-      { memberId: member.id, note: note.trim() },
+      { memberId: m.id, note: note.trim() },
       {
-        onSuccess: () => router.back(),
-        onError: (e) => Alert.alert("Couldn't send request", friendlyError(e)),
+        onSuccess: () => {
+          setSent(true);
+          setTimeout(() => router.back(), 900);
+        },
+        onError: (e) => setError(friendlyError(e)),
       },
     );
+  };
+
+  const blocked = m && m.relation !== 'none';
 
   return (
     <BottomSheet onDismiss={() => router.back()}>
-      <View style={styles.row}>
-        <MemberAvatar path={member.photo_path} size={s(46)} radius={s(14)} />
-        <View style={{ marginLeft: s(14) }}>
-          <Text style={styles.small}>Sending a request to</Text>
-          <Text style={styles.name}>{member.full_name}</Text>
-        </View>
-      </View>
+      {isLoading || !m ? (
+        <Loading style={{ flex: 0, height: s(200) }} />
+      ) : (
+        <>
+          <FadeUp delay={150} style={{ flexDirection: 'row', alignItems: 'center', gap: s(12) }}>
+            <MemberPhoto path={m.photo_path} size={s(46)} radius={s(14)} />
+            <View>
+              <Text style={{ fontFamily: fonts.body, fontSize: s(11.5), color: colors.muted }}>Sending a request to</Text>
+              <Text style={{ fontFamily: fonts.displayBold, fontSize: s(16), color: colors.ink }}>{m.full_name}</Text>
+            </View>
+          </FadeUp>
 
-      <View style={styles.box}>
-        <TextInput
-          value={note}
-          onChangeText={(v) => setNote(v.slice(0, MAX))}
-          placeholder={`Hi ${firstName(member.full_name)}, I run … and would love to …`}
-          placeholderTextColor={colors.placeholder}
-          multiline
-          autoFocus
-          maxLength={MAX}
-          textAlignVertical="top"
-          style={styles.input}
-          accessibilityLabel="Your note"
-        />
-      </View>
-      <Text style={styles.count}>
-        {note.length} / {MAX}
-      </Text>
-
-      <PrimaryButton style={{ marginTop: s(12) }} label="Send Request" icon="send" disabled={!ok} loading={send.isPending} onPress={onSend} />
-      <Text style={styles.fine}>They'll see your note before they approve. You can chat once they accept.</Text>
+          {blocked ? (
+            <FadeUp delay={220} style={{ marginTop: s(18) }}>
+              <Text style={t.body}>
+                {m.relation === 'connected'
+                  ? `You're already connected with ${first}. Say hi in Chats.`
+                  : m.relation === 'outgoing'
+                    ? `Your request to ${first} is waiting for a reply.`
+                    : m.relation === 'incoming'
+                      ? `${first} already sent you a request — check your Requests tab.`
+                      : 'You can’t send a request to this member.'}
+              </Text>
+            </FadeUp>
+          ) : (
+            <>
+              <FadeUp delay={220} style={{ marginTop: s(18) }}>
+                <View
+                  style={{
+                    backgroundColor: colors.white,
+                    borderWidth: s(2.5),
+                    borderColor: error ? colors.error : colors.ink,
+                    borderRadius: s(18),
+                    paddingHorizontal: s(16),
+                    paddingVertical: s(12),
+                    minHeight: s(100),
+                  }}
+                >
+                  <TextInput
+                    value={note}
+                    onChangeText={(v) => {
+                      setNote(v.slice(0, MAX));
+                      if (error) setError(null);
+                    }}
+                    multiline
+                    autoFocus
+                    maxLength={MAX}
+                    placeholder={`Hi ${first}, I run … and would love to …`}
+                    placeholderTextColor={colors.placeholder}
+                    textAlignVertical="top"
+                    accessibilityLabel="Your note"
+                    style={{ fontFamily: fonts.bodyMedium, fontSize: s(14), lineHeight: s(21), color: colors.ink, minHeight: s(76), padding: 0 }}
+                  />
+                </View>
+                <Text style={{ textAlign: 'right', fontFamily: fonts.body, fontSize: s(11.5), color: colors.placeholder, marginTop: s(6) }}>
+                  {length} / {MAX}
+                </Text>
+                {error ? <Helper error>{error}</Helper> : null}
+              </FadeUp>
+              <FadeUp delay={300} style={{ marginTop: s(14) }}>
+                <CtaButton
+                  label={sent ? 'Request sent!' : 'Send Request'}
+                  icon={sent ? 'check' : 'send'}
+                  size="md"
+                  onPress={submit}
+                  loading={send.isPending}
+                  disabled={sent}
+                />
+              </FadeUp>
+              <FadeUp delay={360}>
+                <Text style={{ textAlign: 'center', fontFamily: fonts.body, fontSize: s(11.5), lineHeight: s(16), color: colors.muted, marginTop: s(12) }}>
+                  They'll see your note before they approve. You can chat once they accept.
+                </Text>
+              </FadeUp>
+            </>
+          )}
+        </>
+      )}
     </BottomSheet>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center' },
-  small: { fontFamily: fonts.body, fontSize: s(14), color: colors.textMuted },
-  name: { fontFamily: fonts.display, fontSize: s(19), color: colors.ink, marginTop: -s(2) },
-  box: {
-    marginTop: s(20),
-    minHeight: s(104),
-    borderRadius: s(22),
-    borderWidth: BORDER,
-    borderColor: colors.ink,
-    backgroundColor: colors.white,
-    paddingHorizontal: s(16),
-    paddingVertical: s(12),
-  },
-  input: { fontFamily: fonts.body, fontSize: s(17), lineHeight: s(25), color: colors.ink, minHeight: s(80), padding: 0 },
-  count: { alignSelf: 'flex-end', fontFamily: fonts.body, fontSize: s(13.5), color: '#BAC3D6', marginTop: s(6) },
-  fine: { fontFamily: fonts.body, fontSize: s(13.5), lineHeight: s(19), color: colors.textMuted, textAlign: 'center', marginTop: s(12) },
-});

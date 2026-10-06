@@ -1,90 +1,108 @@
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
 import * as api from '../src/api';
-import { LogoMark } from '../src/components/Layout';
-import { reportError } from '../src/lib/sentry';
+import { refreshLiveLocation } from '../src/lib/liveLocation';
 import { routeForMe } from '../src/lib/routing';
-import { supabase } from '../src/lib/supabase';
-import { syncLocation } from '../src/lib/syncLocation';
-import { resolveLocation } from '../src/services/location';
-import { LocationState, useApp } from '../src/state/AppStore';
+import { reportError } from '../src/lib/sentry';
+import { Pulse } from '../src/motion';
+import { getPermission } from '../src/services/location';
+import { useApp } from '../src/state/AppStore';
 import { useAuth } from '../src/state/AuthProvider';
 import { colors, fonts, s } from '../src/theme/tokens';
+import { PillButton, TextButton } from '../src/ui/Buttons';
+import { LogoMark } from '../src/ui/Header';
+import { Screen } from '../src/ui/Screen';
+
+/** Auth errors mean the saved login is no longer valid; anything else is treated as "offline". */
+const isAuthError = (e: unknown) => {
+  const err = e as { status?: number; code?: string; message?: string } | null;
+  return err?.status === 401 || err?.status === 403 || /jwt|refresh token|not signed in/i.test(err?.message ?? '');
+};
 
 /**
- * 01 · Launch. Takes one foreground location reading, then:
- *  - signed out → welcome (or manual address if location is off)
- *  - signed in  → saves location to Supabase and resumes where they left off
+ * Launch. Signed out → the generic splash (slide 2).
+ * Signed in → refresh live location (if already allowed) and resume where
+ * they left off.
  */
-export default function LocationGate() {
+export default function Launch() {
   const router = useRouter();
-  const { actions } = useApp();
-  const { ready, refreshMe } = useAuth();
+  const { state, actions } = useApp();
+  const { ready, session, refreshMe } = useAuth();
+  const [offline, setOffline] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !state.flagsReady) return;
     let cancelled = false;
     (async () => {
-      await new Promise((r) => setTimeout(r, 500));
-      const result = await resolveLocation();
-      if (cancelled) return;
+      const permission = await getPermission();
+      if (permission.status === 'denied') actions.setLive({ status: 'denied' });
 
-      const loc: Partial<LocationState> =
-        result.status === 'granted'
-          ? {
-              status: 'granted',
-              source: 'device',
-              coords: result.coords,
-              geohash: result.geohash,
-              detectedCity: result.city,
-              detectedArea: result.area,
-            }
-          : { status: result.status, canAskAgain: result.status === 'denied' ? result.canAskAgain : true };
-      actions.setLocation(loc);
-
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        router.replace(result.status === 'granted' ? '/welcome' : '/manual-address');
+      if (!session) {
+        if (permission.status === 'granted') {
+          refreshLiveLocation({ signedIn: false, onFix: actions.setLive });
+        }
+        if (!cancelled) router.replace('/welcome');
         return;
       }
 
       try {
-        const me = await refreshMe();
-        if (result.status === 'granted') {
-          await syncLocation({ ...(loc as LocationState), manualAddress: null });
-        } else if (!me?.location) {
-          // Signed in, location off, and no address on file yet.
-          router.replace('/manual-address');
-          return;
+        if (permission.status === 'granted') {
+          // Don't hold the launch for GPS; Discover refreshes when it arrives.
+          refreshLiveLocation({ signedIn: true, onFix: actions.setLive });
         }
-        if (!cancelled) router.replace(routeForMe(me) as never);
+        const me = await refreshMe();
+        if (!cancelled) router.replace(routeForMe(me, state.flags) as never);
       } catch (e) {
         reportError(e, { where: 'launch' });
-        await api.auth.signOut();
-        if (!cancelled) router.replace('/welcome');
+        if (isAuthError(e)) {
+          await api.auth.signOut();
+          if (!cancelled) router.replace('/welcome');
+        } else if (!cancelled) {
+          setOffline(true);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
+  }, [ready, state.flagsReady, attempt]);
 
   return (
-    <View style={styles.root}>
-      <StatusBar style="light" />
-      <View style={styles.brand}>
-        <LogoMark size={s(72)} faded />
-        <Text style={styles.name}>Vyaparhood</Text>
+    <Screen bg={colors.splash} statusBar="light">
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: s(40) }}>
+        <Pulse>
+          <LogoMark size={s(68)} border={s(3)} borderColor={colors.lime} />
+        </Pulse>
+        <Text style={{ fontFamily: fonts.display, fontSize: s(17), color: colors.white, marginTop: s(14), letterSpacing: 0.3 }}>
+          Vyaparhood
+        </Text>
+        {offline && (
+          <View style={{ alignItems: 'center', marginTop: s(28), gap: s(14) }}>
+            <Text style={{ fontFamily: fonts.bodyMedium, fontSize: s(13), color: colors.navyText, textAlign: 'center' }}>
+              Couldn't connect. Check your internet and try again.
+            </Text>
+            <PillButton
+              label="Try again"
+              tone="lime"
+              onPress={() => {
+                setOffline(false);
+                setAttempt((n) => n + 1);
+              }}
+            />
+            <TextButton
+              label="Log out"
+              color={colors.navyText}
+              onPress={async () => {
+                await api.auth.signOut();
+                router.replace('/welcome');
+              }}
+            />
+          </View>
+        )}
       </View>
-    </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.splash, alignItems: 'center', justifyContent: 'center' },
-  brand: { alignItems: 'center', opacity: 0.18 },
-  name: { fontFamily: fonts.display, fontSize: s(24), color: colors.white, marginTop: s(10) },
-});

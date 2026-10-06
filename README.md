@@ -1,139 +1,182 @@
 # Vyaparhood — app + Supabase backend
 
-Expo / React Native app with a Supabase backend (Postgres + PostGIS, Auth,
-Storage, Realtime, Edge Functions) and Sentry error tracking.
+Expo / React Native app (Expo SDK 57, Reanimated 4) with a Supabase backend
+(Postgres + PostGIS, Auth, Storage, Realtime, Edge Functions) and Sentry
+error tracking.
 
-What works end to end: email OTP sign-in, profile with photo, location
-(device or typed address), Nearby radius search and Citywide list, member
-profiles, connection requests with notes, realtime chat, notifications,
-saved profiles, ratings, report and block, verification documents (private,
-deleted after 30 days), account deletion, and admin tools for the root account.
+What works end to end: phone-number OTP sign-in, onboarding with every
+animation from the design, profile with one photo and a business address,
+Nearby (radar) and Citywide discovery, member profiles, connection requests
+with notes, realtime chat with emoji, notifications, saved profiles, ratings,
+report and block, account deletion after 30 days, and admin tools.
 
-Not built yet: payments (membership is switched on by an admin for now),
-push notifications, SMS OTP.
+Not built yet (on purpose): payments (the app runs as a free beta — see 4.2),
+push notifications.
 
 ---
 
-## 1. One-time setup (about 45 minutes)
+## 1. Supabase — step-by-step setup (dev and prod)
 
-### 1.1 Create two Supabase projects
+You will create **two** Supabase projects and do every step on **dev first**,
+then repeat on **prod**. The table at the end of this section lists what is
+different between them.
 
-At https://supabase.com/dashboard create:
+### 1.1 Create the two projects
 
-| Project | Plan | Region |
-|---|---|---|
-| `vyaparhood-dev` | Free | South Asia (Mumbai) |
-| `vyaparhood-prod` | Pro (daily backups, no pausing) | South Asia (Mumbai) |
+1. Go to https://supabase.com/dashboard → **New project**.
+2. Create:
 
-Free projects pause after a week without use; just un-pause from the dashboard.
+   | Project | Plan | Region | Notes |
+   |---|---|---|---|
+   | `vyaparhood-dev` | Free | South Asia (Mumbai) | Pauses after 7 days idle — un-pause from the dashboard |
+   | `vyaparhood-prod` | Pro | South Asia (Mumbai) | Daily backups, never pauses |
 
-For each project, note from **Project Settings → API**: the Project URL, the
-`anon` key, and the project ref (the `abcd…` part of the URL).
-The `service_role` key never goes into the app or into git.
+3. Save the **database password** you set for each (a password manager is ideal).
+4. For each project open **Project Settings → API** and note:
+   * **Project URL** — `https://<ref>.supabase.co` (the `<ref>` part is the *project ref*)
+   * **anon / public key** — safe to put in the app
+   * **service_role key** — NEVER put this in the app or in git
 
-### 1.2 Create the database (do this on dev, then on prod)
+### 1.2 Create the database
 
-**Option A — Supabase CLI (recommended):**
+The whole schema (tables, row-level security, storage bucket, realtime,
+all functions) is in `supabase/migrations/20260928000000_init.sql`.
+
+**Option A — Supabase CLI (recommended).** On Windows, run the CLI through
+`npx` (a global npm install isn't supported):
 
 ```bash
-npm install -g supabase
-supabase login
-supabase link --project-ref YOUR-DEV-REF
-supabase db push            # runs supabase/migrations/*.sql
+npx supabase@latest login
+npx supabase@latest link --project-ref YOUR-DEV-REF
+npx supabase@latest db push
 ```
 
-To target prod later: `supabase link --project-ref YOUR-PROD-REF` then `supabase db push`.
+`link` asks for that project's database password.
 
-**Option B — no CLI:** open **SQL Editor → New query**, paste the whole of
-`supabase/migrations/20260927000000_init.sql`, run it.
+**Option B — no CLI.** Dashboard → **SQL Editor → New query**, paste the whole
+migration file, press **Run**.
 
-### 1.3 Root admin + demo data
+Check it worked: **Table Editor** should list `profiles`, `business_locations`,
+`live_locations`, `messages` … and **Storage** should show a private bucket
+called `avatars`.
 
-* **Dev project only:** run `supabase/dev/seed_dev.sql` in the SQL Editor.
-  It makes **shettyjay12345@gmail.com** an admin with an active membership and
-  creates 10 demo members. When that account signs up, it automatically gets
-  2 incoming requests (Karan, Neha), 2 chats (Riya, Arjun), 3 saved profiles,
-  and the demo members are placed 0.8–12 km around wherever you are testing,
-  in your city.
-* **Prod project:** edit `supabase/prod/bootstrap_prod.sql` (replace
-  `REPLACE_WITH_PROD_ADMIN_EMAIL`), then run it. No demo data.
+> Already ran the *previous* version of this project's migration on a
+> Supabase project? The schema changed completely (phone login, two
+> locations, no document uploads). With no real users yet, the cleanest fix is
+> a fresh project, or on dev only: `npx supabase@latest db reset --linked`
+> (this **erases everything** in that database), then `db push`.
+
+### 1.3 Phone login (SMS OTP)
+
+Dashboard → **Authentication → Sign In / Providers → Phone**:
+
+1. Turn **Enable Phone provider** on.
+2. **SMS OTP length:** `6` (the app expects 6 digits — `OTP_LENGTH` in `src/config.ts`).
+3. **SMS OTP expiry:** `600` seconds.
+4. Choose an SMS provider (next two sections).
+
+Also turn **off** the Email provider if you don't want email sign-ups at all
+(the app only uses phone).
+
+#### Dev: test numbers (no SMS needed)
+
+In the same Phone settings, fill **Test Phone Numbers and OTPs**, one per line,
+country code + number, digits only:
+
+```
+919999999999=123456
+919888888888=654321
+```
+
+and set **Test OTPs valid until** to a date a few months ahead. Those numbers
+log in with the fixed code and no SMS is ever sent. If the dashboard won't
+save the Phone provider without SMS-provider credentials, enter the Twilio
+details from the next step (or placeholders on dev) — test numbers never use them.
+
+#### Prod: a real SMS provider
+
+Indian SMS needs a TRAI DLT-registered sender. The simplest route with
+Supabase's built-in providers is **Twilio Verify**:
+
+1. Create a Twilio account → **Verify → Services → Create** (name: Vyaparhood,
+   code length 6). Read Twilio's current notes on sending OTPs to India.
+2. In Supabase's Phone provider choose **Twilio Verify** and paste the
+   **Account SID**, **Auth Token** and **Verify Service SID**.
+3. **Authentication → Rate Limits → SMS sent per hour**: raise from the
+   default to what you expect at launch.
+4. Log in once with your own real number to confirm SMS delivery.
+
+Cheaper Indian gateways (MSG91, Gupshup, Fast2SMS) can be plugged in later
+through Supabase's **Send SMS Hook** (Authentication → Hooks) with a small
+Edge Function — no app change needed.
+
+### 1.4 Root admin and demo data
+
+**Dev only:** open `supabase/dev/seed_dev.sql`, replace `919999999999` (two
+places) with the number you test with (use one of your test numbers from 1.3),
+then run the file in the SQL Editor. It:
+
+* makes that number the root admin,
+* creates 10 demo businesses around Bandra, Mumbai,
+* when that number signs up: 2 incoming requests (Karan, Neha), 2 chats
+  (Riya, Arjun), 3 saved profiles, and the demo businesses move to within a
+  few km of wherever you are testing, in your city.
+
+**Prod:** edit `supabase/prod/bootstrap_prod.sql` (replace `91XXXXXXXXXX` in
+two places with the admin's number), then run it. No demo data.
 
 Both files are safe to run again and also work if the account already exists.
 
-### 1.4 Email OTP through Hostinger (both projects)
+### 1.5 30-day account deletion job
 
-**a) Turn on email codes.** Authentication → Sign In / Providers → Email:
-Email provider **on**, Confirm email **on**, Email OTP length **6**,
-Email OTP expiration **600** seconds.
-
-**b) Custom SMTP.** Authentication → Emails → SMTP Settings → enable:
-
-| Field | Value |
-|---|---|
-| Sender email | `no-reply@vyaparhood.com` |
-| Sender name | `Vyaparhood` |
-| Host | `smtp.hostinger.com` |
-| Port | `465` |
-| Username | `no-reply@vyaparhood.com` |
-| Password | that mailbox's password (from Hostinger → Emails) |
-
-**c) Make the email contain the code, not a link.** Authentication → Emails →
-Templates. Edit **both** "Magic Link" and "Confirm signup" (new users can get
-the second one). Example body:
-
-```html
-<h2>Your Vyaparhood code</h2>
-<p>Enter this code in the app to sign in:</p>
-<p style="font-size:28px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
-<p>It expires in 10 minutes. If you didn't ask for it, ignore this email.</p>
-```
-
-Subject: `Your Vyaparhood code: {{ .Token }}`
-
-**d) Rate limit.** Authentication → Rate Limits → "Emails sent per hour":
-raise it from the default to what your Hostinger plan allows. Check the
-daily sending limit of your Hostinger email plan before launch.
-
-**e) Stop codes going to spam.** In Hostinger's DNS for vyaparhood.com make
-sure SPF, DKIM and DMARC records exist for Hostinger mail (Hostinger →
-Emails → your domain → DNS / Deliverability shows the exact records).
-Then send yourself a code on Gmail and check it lands in the inbox.
-
-### 1.5 Edge Functions + 30-day document deletion (both projects)
+When a member deletes their account it is hidden at once; a daily job
+deletes it for good after 30 days (unless they log back in and restore it).
 
 ```bash
-supabase link --project-ref YOUR-REF
-supabase functions deploy delete-account
-supabase functions deploy purge-expired-documents --no-verify-jwt
-supabase secrets set CRON_SECRET=$(openssl rand -hex 32)   # note the value
+npx supabase@latest link --project-ref YOUR-REF
+npx supabase@latest functions deploy purge-deleted-accounts --no-verify-jwt
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+npx supabase@latest secrets set CRON_SECRET=<the value printed above>
 ```
 
-Then open `supabase/cron_jobs.sql`, replace `<PROJECT_REF>` and `<CRON_SECRET>`,
-and run it in the SQL Editor. It calls the purge function daily at 03:00 IST.
+Then open `supabase/cron_jobs.sql`, replace `<PROJECT_REF>` and
+`<CRON_SECRET>`, and run it in the SQL Editor. It runs daily at 03:00 IST.
+Use a **different** secret for dev and prod.
 
-### 1.6 Sentry
+Test it on dev: SQL Editor →
+`select net.http_post(url := 'https://<ref>.supabase.co/functions/v1/purge-deleted-accounts', headers := jsonb_build_object('x-cron-secret', '<secret>'));`
+then **Edge Functions → purge-deleted-accounts → Logs** should show a run.
 
-1. Create a free account at https://sentry.io → new project → platform
-   **React Native**, name `vyaparhood`.
-2. Copy the **DSN** into `EXPO_PUBLIC_SENTRY_DSN` (step 1.7) and into `eas.json`.
-3. In `app.json`, replace `REPLACE_WITH_SENTRY_ORG` with your Sentry
-   organization slug.
-4. For readable stack traces in production builds, create a Sentry auth
-   token and add it as an EAS secret: `eas secret:create --name SENTRY_AUTH_TOKEN`.
-   Dev builds skip the upload (`SENTRY_DISABLE_AUTO_UPLOAD` in `eas.json`).
-
-Only a random user id is sent to Sentry — never email, phone or IP.
-
-### 1.7 App environment files
+### 1.6 Connect the app
 
 ```bash
 cp .env.example .env.development   # dev project URL + anon key
-cp .env.example .env.production    # prod project URL + anon key, APP_ENV=production
+cp .env.example .env.production    # prod URL + anon key, EXPO_PUBLIC_APP_ENV=production
 ```
 
-Expo loads `.env.development` for `npx expo start` automatically. Both files
-are git-ignored. Also fill the placeholders in `eas.json` (used by EAS cloud
-builds, which don't see your `.env` files).
+Expo loads `.env.development` for `npx expo start`. Both files are git-ignored.
+EAS cloud builds don't see `.env` files, so also replace the placeholders in
+`eas.json` (`development` / `preview` profiles → dev keys, `production` → prod keys).
+
+### 1.7 Sentry (optional)
+
+1. https://sentry.io → new project → **React Native**, name `vyaparhood`.
+2. Put the **DSN** in `EXPO_PUBLIC_SENTRY_DSN` (both env files and `eas.json`).
+3. In `app.json`, replace `REPLACE_WITH_SENTRY_ORG` with your organisation slug.
+4. For readable stack traces in production builds: `eas secret:create --name SENTRY_AUTH_TOKEN`.
+
+Only a random user id is sent to Sentry — never phone numbers or locations.
+
+### 1.8 Dev vs prod at a glance
+
+| Step | Dev | Prod |
+|---|---|---|
+| Plan | Free | Pro |
+| Migration (1.2) | ✓ | ✓ |
+| Phone login (1.3) | Test numbers (+ Twilio when ready) | Twilio Verify (real SMS), higher rate limit |
+| Seed / bootstrap (1.4) | `dev/seed_dev.sql` | `prod/bootstrap_prod.sql` — **never** the dev seed |
+| Deletion job (1.5) | ✓ (own secret) | ✓ (own secret) |
+| App keys (1.6) | `.env.development`, eas dev/preview | `.env.production`, eas production |
 
 ---
 
@@ -141,130 +184,187 @@ builds, which don't see your `.env` files).
 
 ```bash
 npm install
-npx expo install --fix     # pins every native package to your Expo SDK
+npx expo install --fix
 npx expo start --clear
 ```
 
-Scan the QR code with Expo Go. Sign in with shettyjay12345@gmail.com; the
-6-digit code arrives from no-reply@vyaparhood.com.
-
-* `npm run start:prod` runs against the production project (macOS/Linux shell syntax).
-* Settings shows "DEVELOPMENT" at the bottom when you're on the dev project.
-* Expo Go is fine for everything here. Sentry's native crash reporting only
-  works in a development build (`eas build --profile development`), but
-  JavaScript errors are reported from Expo Go too.
-
-### Testing with a second person
-
-Sign up a second email. It will stop at the paywall (payments aren't live).
-From the root account: Profile → Settings → **Admin tools → Members** →
-search → **Grant**. The second account taps "Already activated? Check again".
+Scan the QR code with Expo Go and log in with your test number and its fixed
+code. Settings shows "DEVELOPMENT" at the bottom when you're on the dev project.
+`npm run start:prod` runs against prod (macOS/Linux shell syntax).
 
 ---
 
-## 3. How the security works
+## 3. The first-launch flow
+
+1. **Splash (2)** → *Get Started*
+2. **Location dialog (1)** — Allow → the phone's own permission popup →
+   **City splash (2b, "Your Surat business, sorted")**, shown once.
+   Don't allow → an explanation that Nearby needs location → still no →
+   straight to onboarding.
+3. **Onboarding (3 → 4 → 5)** — *Skip* on any of them jumps to the phone page.
+4. **Phone + OTP (6+7 on one page)** → **Consent (8)** → **City (9)** →
+   **Profile + business address (10)** → **Notifications (13)** →
+   **Plans (14)** → **Discover (15)**.
+
+On iPhone, the location and notification dialogs keep the design's look but
+say *Continue / Not now* (Apple rejects custom screens that imitate its
+"Allow" popup); Android keeps the design's exact wording.
+
+---
+
+## 4. How things work
+
+### 4.1 Two locations per member
+
+* **Business address** (`business_locations`) — typed on page 10 / 26
+  (address, area, pincode, city). The phone's free geocoder turns it into a
+  map point; if it can't, the server tries the pincode (see 6); if that
+  fails too, the business still appears in Citywide but not Nearby.
+  **Other members find you by this.**
+* **Live location** (`live_locations`) — where the phone was when the app
+  last opened (only if location is allowed). Used **only** as the start of
+  your own Nearby search. If it's older than 12 hours or missing, your
+  search starts from your business address instead.
+* Nobody ever sees anyone's address or coordinates — only area, city and a
+  distance (rounded to 0.5 km unless the member turns on "Show my exact
+  distance").
+
+### 4.2 Plans and billing (free beta)
+
+The paywall shows **₹299/month (Early bird, highlighted)** and **₹99 for a
+week**. Billing is **off**: picking a plan records the choice and lets the
+member in free. When payments are ready:
+
+1. Add a payment provider in `src/services/payments/` whose purchases are
+   confirmed by a Supabase Edge Function that sets `memberships.active`.
+2. Turn billing on: **Profile → Admin tools → App → Billing enabled**, or
+   `update public.app_settings set billing_enabled = true;`
+
+Prices live in `src/services/payments/index.ts`.
+
+### 4.3 Deleting an account
+
+Settings → *Delete account* hides the profile immediately, cancels pending
+requests and signs out. Logging back in within 30 days shows a *Restore my
+account* screen. After 30 days the daily job (1.5) deletes the photo and the
+auth user, which cascades to every table.
+
+### 4.4 One photo per member
+
+The database only lets a member write `avatars/<their id>/avatar.jpg`, so
+there can never be more than one photo each. The app crops it square and
+shrinks it to 720 px JPEG (~60–120 KB) before upload.
+
+### 4.5 Chat
+
+Only possible inside an accepted connection (enforced by the database), and
+stops the moment either person blocks the other, is banned or deletes their
+account. The smiley button opens a built-in emoji picker; the phone's emoji
+keyboard works too.
+
+### 4.6 Animations
+
+Every animation from the design lives in `src/motion/index.tsx` as a small
+component with the design's timing and easing: `FadeUp`, `Breathe` (CTA),
+`KenBurns`, `Squiggle` (self-drawing underline), `Wiggle`, `Float`, `Pop`,
+`PinPop`, `Pulse`, `PulseDot`, `Ping`, `RingPulse`, `Halo`, `SheetIn`,
+`SheetUp`, `BubbleIn`, `StarPop`, `Settle`, plus the CTA press effect.
+
+* The design's entrance only slides (no fade). Set `ENTRANCE_FADE = true` in
+  that file to add a fade to every entrance at once.
+* If the phone's **Reduce motion** setting is on, everything appears in place
+  without moving.
+
+---
+
+## 5. Security
 
 * **Nobody signed out can read anything.** The `anon` role has no table access.
-* **Row-level security on every table.** You can read and change only your
-  own rows. Anything about other people comes from database functions
-  (`discover_members`, `get_member`, `my_chats`, …) that return only public
-  fields: name, title, category, area, city, a distance, photo path.
-* **Coordinates never leave the server.** `user_locations` is readable only
-  by its owner. Others see a distance rounded to 0.5 km unless that member
-  turns on "Show my exact distance".
-* **Profile columns are locked.** The app can update name/bio/etc., but not
-  `is_admin`, `is_banned`, `verification_status` or membership — those are
-  column-level permissions in Postgres, not app code.
-* **Membership can't be faked from a phone.** Only admins (and later a
-  payment Edge Function using the service key) can switch it on.
-* **Photos** are in a private bucket; members get 1-hour signed links.
-* **Verification documents** are in a separate private bucket readable only
-  by the owner and admins, deleted permanently after 30 days.
-* **Chat** is only possible inside an accepted connection; blocking stops
-  messages instantly (enforced by the database).
+* **Row-level security on every table.** You can read and change only your own
+  rows; anything about other people comes from database functions
+  (`discover_members`, `get_member`, `my_chats` …) that return only public fields.
+* **Locations never leave the server** except as a rounded distance.
+* **Profile columns are locked:** the app can't change `is_admin`, `is_banned`,
+  `verification_status`, `phone` or membership.
+* **Membership can't be faked from a phone** — only admins and (later) a
+  payment Edge Function can switch it on.
+* **Instagram / LinkedIn handles** are shown only to connected members.
 * **Login session** is stored AES-encrypted, with the key in the iOS
   Keychain / Android Keystore.
 
-When you add a new table later: `alter table … enable row level security;`
-and add policies — Supabase grants new tables to logged-in users by default.
+When you add a table later: `alter table … enable row level security;` and add
+policies — Supabase grants new tables to logged-in users by default.
 
 ---
 
-## 4. Project map
+## 6. Before launching on prod
+
+* Prod on the Pro plan; consider Point-in-Time Recovery once members pay.
+* Migration, `bootstrap_prod.sql`, Edge Function and cron on prod — never `seed_dev.sql`.
+* Real SMS provider tested with a real number; SMS rate limit raised.
+* Name a Grievance Officer and publish the privacy policy URL (DPDP Act);
+  consent time is stored in `profiles.consented_at`.
+* Recommended: import India Post pincode centroids into `public.pincodes`
+  (`pincode, lat, lng`; data.gov.in "All India Pincode Directory") so
+  addresses the phone can't geocode still appear in Nearby.
+* Have a lawyer review the Terms, Privacy Policy and Community Guidelines.
+
+---
+
+## 7. Project map
 
 ```
 supabase/
-  migrations/20260927000000_init.sql  schema, RLS, storage, all RPCs (dev + prod)
+  migrations/20260928000000_init.sql  schema, RLS, storage, RPCs (dev + prod)
   dev/seed_dev.sql                    root admin + demo data (DEV ONLY)
   prod/bootstrap_prod.sql             root admin for prod
-  functions/delete-account            deletes user, files, everything
-  functions/purge-expired-documents   30-day document deletion
+  functions/purge-deleted-accounts    deletes accounts 30 days after request
   cron_jobs.sql                       daily schedule for the purge
-src/lib/        env, supabase client, encrypted session storage, sentry, uploads
+src/motion/     every animation from the design
+src/ui/         design components (buttons, headings, fields, dialogs, sheets, tab bar …)
+src/features/   bigger pieces (profile form, radar, member card, emoji panel, legal page)
 src/api/        index.ts (every server call), hooks.ts (caching), types, realtime
 src/state/      AuthProvider (session + your profile), AppStore (device-only state)
-app/            screens (admin tools in app/admin)
+src/services/   location, notifications, payments
+app/            screens (file name = route)
 ```
-
-## 5. Before launching on the production project
-
-* Prod on the Pro plan; consider Point-in-Time Recovery once you have paying members.
-* Run the migration, `bootstrap_prod.sql`, Edge Functions and cron on prod
-  — never `seed_dev.sql`.
-* Authentication → URL/Rate limits and SMTP set up on prod as in 1.4.
-* Name a Grievance Officer and publish the privacy policy URL (DPDP Act);
-  the app records consent time in `profiles.consented_at`.
-* Optional: import India Post pincode coordinates into `public.pincodes`
-  (`pincode, lat, lng`; data.gov.in "All India Pincode Directory") so members
-  who type an address instead of sharing location appear in Nearby.
-  Without it they only appear in Citywide.
-* When payments are chosen: add an Edge Function that verifies the purchase
-  with Apple / Google / Cashfree and sets `memberships.active`, then swap the
-  provider in `src/services/payments/index.ts`.
-
-## 6. If something goes wrong
-
-| Symptom | Likely cause |
-|---|---|
-| "Supabase keys missing" screen | `.env.development` missing or Expo not restarted with `--clear` |
-| Email arrives with a link, not a code | Template in 1.4c not edited (edit both templates) |
-| No email at all | SMTP password/port wrong, or Hostinger rate limit; check Authentication → Logs |
-| Code rejected | Codes expire after 10 min and only the newest one works |
-| Stuck on paywall | Account has no membership; grant it in Admin → Members |
-| Nearby is empty | Location off and no pincode data, or demo seed not run (dev) |
-| "permission denied for table …" | Migration not fully applied; re-run it on a fresh project |
-
-## 7. Screen map
 
 | # | Screen | File |
 |---|---|---|
-| 01 | Location permission (on launch) | `app/index.tsx` |
-| — | Manual address (location denied) | `app/manual-address.tsx` |
-| 02/03 | Welcome / "Surat · Live now" | `app/welcome.tsx` |
-| 04–06 | Onboarding | `app/onboarding/*` |
-| 07 | Email sign-in (replaces phone) | `app/auth/email.tsx` |
-| 08 | OTP | `app/auth/otp.tsx` |
-| 09 | Consent | `app/auth/consent.tsx` |
-| 10 | City | `app/auth/city.tsx` |
-| 11 | Profile setup | `app/auth/profile-setup.tsx` |
-| 12 | Verification documents | `app/auth/verify-docs.tsx` |
-| 13 | Under review | `app/auth/under-review.tsx` |
-| 14 | Notification permission | `app/auth/notifications.tsx` |
-| 15 | Paywall | `app/paywall.tsx` |
-| 16/17 | Discover (Citywide / Nearby radar) | `app/(tabs)/discover.tsx` |
-| 18 | Filters | `app/filters.tsx` |
-| 19 | Member profile | `app/member/[id].tsx` |
-| 20 | Send request | `app/send-request/[id].tsx` |
-| 21 | Requests | `app/(tabs)/requests.tsx` |
-| 22 | Chats | `app/(tabs)/chats.tsx` |
-| 23 | Chat thread | `app/chat/[id].tsx` |
-| 24 | Rate meetup | `app/rate/[id].tsx` |
-| 25 | Report or block | `app/report/[id].tsx` |
-| 26 | Notifications | `app/notifications.tsx` |
-| 27 | My profile | `app/(tabs)/profile.tsx` |
-| 28 | Edit profile | `app/edit-profile.tsx` |
-| 29 | Saved profiles | `app/saved.tsx` |
-| 30 | Settings | `app/settings.tsx` |
-| 31–33 | Guidelines / Terms / Privacy | `app/legal/*` |
-| — | Admin tools (admins only) | `app/admin/index.tsx` |
-| — | Suspended account | `app/banned.tsx` |
+| 1 | Location permission | `app/location.tsx` |
+| 2 / 2b | Splash / City splash | `app/welcome.tsx`, `app/welcome-city.tsx` |
+| 3–5 | Onboarding | `app/onboarding/nearby.tsx`, `context.tsx`, `why.tsx` |
+| 6+7 | Phone + OTP | `app/auth/phone.tsx` |
+| 8 | Age & consent | `app/auth/consent.tsx` |
+| 9 | City | `app/auth/city.tsx` |
+| 10 | Create profile + business address | `app/auth/profile.tsx` |
+| 13 | Notifications | `app/auth/notifications.tsx` |
+| 14 | Plans | `app/paywall.tsx` |
+| 15 / 15b | Discover (Citywide / Nearby) | `app/(tabs)/discover.tsx` |
+| 16 | Filters | `app/filters.tsx` |
+| 17 | Member profile | `app/member/[id].tsx` |
+| 18 | Send request | `app/send-request/[id].tsx` |
+| 19 | Requests | `app/(tabs)/requests.tsx` |
+| 20 / 21 | Chats / Chat thread | `app/(tabs)/chats.tsx`, `app/chat/[id].tsx` |
+| 22 | Rate a meeting | `app/rate/[id].tsx` |
+| 23 | Report or block | `app/report/[id].tsx` |
+| 24 | Notifications list | `app/notifications.tsx` |
+| 25 / 26 | My profile / Edit profile | `app/(tabs)/profile.tsx`, `app/edit-profile.tsx` |
+| 27 | Saved profiles | `app/saved.tsx` |
+| 28 | Settings (incl. delete account) | `app/settings.tsx` |
+| 29–31 | Guidelines / Terms / Privacy | `app/legal/*` |
+| — | City switcher, Blocked members, Restore account, Suspended, Admin | `app/city-select.tsx`, `app/blocked.tsx`, `app/restore-account.tsx`, `app/banned.tsx`, `app/admin/index.tsx` |
+
+---
+
+## 8. If something goes wrong
+
+| Symptom | Likely cause |
+|---|---|
+| "Supabase keys missing" screen | `.env.development` missing, or Expo not restarted with `--clear` |
+| "We couldn't send the SMS" | Phone provider off, provider credentials wrong, or number not in the test list (dev) |
+| Code rejected | Codes expire after 10 min; only the newest code works; test numbers use their fixed code |
+| Nearby is empty | Location off and no business point, or demo seed not run (dev), or distance filter too small |
+| "We couldn't place your address on the map" | Phone geocoder didn't recognise it — add building/street, or import pincodes (6) |
+| "permission denied for table …" | Migration not fully applied; re-run it on a fresh project |
+| Deleted accounts never disappear | Edge Function not deployed, `CRON_SECRET` mismatch, or cron SQL not run (1.5) |

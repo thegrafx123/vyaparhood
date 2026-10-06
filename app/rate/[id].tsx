@@ -1,29 +1,33 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { PrimaryButton } from '../../src/components/Buttons';
-import { Chip, TextField } from '../../src/components/Controls';
-import { Heading } from '../../src/components/Heading';
-import { Star } from '../../src/components/icons';
-import { Footer, HeaderRow, KeyboardArea, Screen } from '../../src/components/Layout';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { friendlyError } from '../../src/api/errors';
 import { useMember, useMyRating, useRate } from '../../src/api/hooks';
+import { FadeUp, StarPop } from '../../src/motion';
 import { colors, H_PAD, s } from '../../src/theme/tokens';
 import { type as t } from '../../src/theme/typography';
-import { firstName } from '../../src/utils/validation';
+import { CtaButton } from '../../src/ui/Buttons';
+import { Loading } from '../../src/ui/Cards';
+import { Chip, Field, Helper } from '../../src/ui/Form';
+import { BackButton } from '../../src/ui/Header';
+import { AccentHeading } from '../../src/ui/Heading';
+import { Star } from '../../src/ui/icons';
+import { Footer, KeyboardArea, Screen } from '../../src/ui/Screen';
 
 const TAGS = ['Professional', 'Great conversation', 'On time', 'Would recommend', 'Responsive'];
 
-/** 24 · Rate a meetup. Only possible with accepted connections. */
-export default function RateMeetup() {
-  const router = useRouter();
+/** 22 · Rate a meeting. Only possible with members you're connected to. */
+export default function RateMeeting() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: member } = useMember(String(id));
-  const { data: existing } = useMyRating(String(id));
+  const router = useRouter();
+  const { data: m } = useMember(id);
+  const { data: existing, isLoading } = useMyRating(id);
   const rate = useRate();
   const [stars, setStars] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
   const [note, setNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const first = m?.full_name.split(' ')[0] ?? 'them';
 
   useEffect(() => {
     if (existing) {
@@ -33,84 +37,81 @@ export default function RateMeetup() {
     }
   }, [existing]);
 
-  if (!member) return null;
-  const first = firstName(member.full_name);
-  const canRate = member.relation === 'connected';
-
-  const submit = () =>
+  const submit = () => {
+    if (!id || stars < 1) {
+      setError('Tap a star to rate.');
+      return;
+    }
     rate.mutate(
-      { memberId: member.id, rating: { stars, tags, note: note.trim() } },
-      {
-        onSuccess: () => {
-          Alert.alert('Rating saved', `Thanks — this helps everyone who meets ${first} after you.`);
-          router.back();
-        },
-        onError: (e) => Alert.alert("Couldn't save rating", friendlyError(e)),
-      },
+      { memberId: id, rating: { stars, tags, note: note.trim() } },
+      { onSuccess: () => router.back(), onError: (e) => setError(friendlyError(e)) },
     );
+  };
 
   return (
-    <Screen>
+    <Screen texture>
       <KeyboardArea>
-        <HeaderRow />
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Heading parts={['How was your', { accent: 'meetup', squiggle: false }, `with ${first}?`]} />
-          <Text style={[t.subtitle, { marginTop: s(8) }]}>
-            Keeps the community honest — for everyone who meets them after you.
-          </Text>
+        <FadeUp delay={20} style={{ paddingHorizontal: s(24), paddingTop: s(22), flexDirection: 'row' }}>
+          <BackButton />
+        </FadeUp>
+        {isLoading ? (
+          <Loading />
+        ) : (
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: H_PAD, paddingTop: s(20), paddingBottom: s(24) }}>
+            <FadeUp delay={80}>
+              <AccentHeading parts={['How was your', { accent: 'meetup', squiggle: false }, `with ${first}?`]} size={27} accentSize={32} lineHeight={1.15} />
+              <Text style={[t.subtitle, { fontSize: s(13), marginTop: s(8) }]}>
+                Keeps the community honest — for everyone who meets them after you.
+              </Text>
+            </FadeUp>
 
-          <View style={styles.stars} accessibilityRole="adjustable" accessibilityLabel={`${stars} of 5 stars`}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <Pressable key={n} onPress={() => setStars(n)} hitSlop={6} accessibilityLabel={`${n} star${n > 1 ? 's' : ''}`}>
-                <Star
-                  size={s(40)}
-                  color={colors.ink}
-                  fill={n <= stars ? colors.star : colors.white}
-                  strokeWidth={1.6}
-                />
-              </Pressable>
-            ))}
-          </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: s(8), marginTop: s(26) }} accessibilityRole="adjustable" accessibilityLabel={`Rating: ${stars} of 5`}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <StarPop key={n} delay={160 + (n - 1) * 50}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${n} star${n > 1 ? 's' : ''}`} onPress={() => setStars(n)} hitSlop={4}>
+                    <Star size={s(34)} color={colors.ink} fill={n <= stars ? colors.star : colors.white} />
+                  </Pressable>
+                </StarPop>
+              ))}
+            </View>
 
-          <Text style={[t.label, { marginTop: s(28), marginBottom: s(12) }]}>What stood out?</Text>
-          <View style={styles.chips}>
-            {TAGS.map((tag) => (
-              <Chip
-                key={tag}
-                label={tag}
-                selected={tags.includes(tag)}
-                onPress={() => setTags((x) => (x.includes(tag) ? x.filter((y) => y !== tag) : [...x, tag]))}
+            <FadeUp delay={400} style={{ marginTop: s(28) }}>
+              <Text style={[t.label, { marginBottom: s(10) }]}>What stood out?</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(8) }}>
+                {TAGS.map((tag) => (
+                  <Chip
+                    key={tag}
+                    label={tag}
+                    size="md"
+                    selected={tags.includes(tag)}
+                    onPress={() => setTags((v) => (v.includes(tag) ? v.filter((x) => x !== tag) : [...v, tag]))}
+                  />
+                ))}
+              </View>
+            </FadeUp>
+
+            <FadeUp delay={460} style={{ marginTop: s(22) }}>
+              <Field
+                label={`Add a note for ${first}`}
+                optional="(optional)"
+                value={note}
+                onChangeText={setNote}
+                placeholder="Great chat about the launch plan — thank you!"
+                multiline
+                maxLength={280}
               />
-            ))}
-          </View>
-
-          <TextField
-            containerStyle={{ marginTop: s(24) }}
-            label={`Add a note for ${first}`}
-            optionalHint="(optional)"
-            placeholder="Great chat about the launch plan — thank you!"
-            value={note}
-            onChangeText={setNote}
-            multiline
-            height={s(110)}
-            maxLength={280}
-          />
-          {!canRate && (
-            <Text style={[t.helper, { marginTop: s(12) }]}>
-              You can rate members once you're connected.
-            </Text>
-          )}
-        </ScrollView>
-        <Footer>
-          <PrimaryButton label="Submit rating" onPress={submit} disabled={stars === 0 || !canRate} loading={rate.isPending} />
-        </Footer>
+            </FadeUp>
+            {error ? <Helper error>{error}</Helper> : null}
+          </ScrollView>
+        )}
+        <View>
+          <FadeUp delay={500}>
+            <Footer style={{ paddingTop: s(10) }}>
+              <CtaButton label="Submit rating" icon="check" onPress={submit} loading={rate.isPending} disabled={stars < 1} />
+            </Footer>
+          </FadeUp>
+        </View>
       </KeyboardArea>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { paddingHorizontal: H_PAD, paddingTop: s(26), paddingBottom: s(24) },
-  stars: { flexDirection: 'row', justifyContent: 'center', gap: s(14), marginTop: s(30) },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: s(9) },
-});

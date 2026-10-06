@@ -1,10 +1,9 @@
 import { Dimensions } from 'react-native';
 
 /**
- * The designs are iPhone frames exported at 3x (1170 × 2532 px),
- * i.e. a 390 × 844 pt canvas. Every size in this app is written in
- * design points and passed through `s()`, which scales it to the
- * current device width so layouts keep their proportions.
+ * The designs are 390 × 844 pt phone frames. Every size in this app is
+ * written in design points and passed through `s()`, which scales it to
+ * the current device width so layouts keep their proportions.
  */
 const DESIGN_WIDTH = 390;
 const screenWidth = Dimensions.get('window').width;
@@ -12,79 +11,78 @@ const factor = Math.min(Math.max(screenWidth, 320), 460) / DESIGN_WIDTH;
 
 export const s = (n: number) => Math.round(n * factor * 10) / 10;
 
-/** Colours sampled directly from the design files. */
+/** Colours taken from the design files. */
 export const colors = {
-  ink: '#142340',
+  ink: '#16233F',
   blue: '#2F6FEA',
   lime: '#B6FF3C',
-  green: '#7CC810',
-  online: '#79BC0A',
-  bg: '#F9FAFF',
+  bg: '#F8FAFF',
   white: '#FFFFFF',
 
-  text: '#5B6B85',
-  textMuted: '#858FA2',
-  placeholder: '#AEB6CB',
-  divider: '#E4E9F4',
+  text: '#5A6B8C',
+  muted: '#8A97B5',
+  placeholder: '#B7C1D9',
+  line: '#E3ECFF',
+  lineSoft: '#E7ECF7',
+  dot: '#C9D6EE',
+  handle: '#D7E0F2',
 
-  blueSoft: '#E8EFFC',
-  inputBg: '#EEF3FD',
-  hatch: '#E8F0FC',
-  hatchStripe: '#DCE6FB',
-  hatchIcon: '#8FAEEA',
-  hatchText: '#5A82CA',
+  blueSoft: '#EAF2FF',
+  blueSoft2: '#E9EFFC',
+  inputBg: '#F4F7FF',
 
-  tealSoft: '#E4F4F2',
-  teal: '#0A8B75',
-  noteText: '#0D695C',
-  orangeSoft: '#FCECE4',
-  orange: '#B05028',
-  peachIcon: '#F08A5D',
-  yellowSoft: '#FCF4E4',
-  yellow: '#A17206',
-  blueTag: '#3C63AE',
+  teal: '#1A9385',
+  tealSoft: '#E6F7F4',
+  tealBlob: '#22B8A6',
+  orange: '#C85A32',
+  orangeSoft: '#FFEFE7',
+  peach: '#FF8A5B',
+  yellow: '#B8790A',
+  yellowSoft: '#FFF6E3',
+  green: '#7FCB13',
+  greenText: '#5A8C3A',
+  star: '#FFC93C',
 
-  radar: '#DCE8FC',
-  radarRing: '#C6D3F5',
-  radarHalo: '#CFDDFB',
-
-  shadowSoft: '#D5DBE8',
-  dot: '#CBD5EA',
-  alert: '#FF8B5E',
-  star: '#FFC83D',
-  danger: '#B75E26',
+  navyText: '#8FA0C7',
+  splash: '#16233F',
+  alertBg: 'rgba(247,247,250,0.98)',
+  alertText: '#6B7280',
+  alertLine: 'rgba(0,0,0,0.15)',
+  dim: 'rgba(15,20,35,0.5)',
+  backdrop: 'rgba(22,35,63,0.55)',
   error: '#D14343',
-
-  navy: '#15213D',
-  navyText: '#A9B3C8',
-  splash: '#121A33',
-  blobLime: '#C3FF5A',
-  blobReview: '#ECF8E0',
-  blobTeal: '#D8F0F0',
-  heroSky: '#B4DBFD',
-  backdrop: 'rgba(20, 35, 64, 0.42)',
 };
 
 /**
  * Font families (loaded in app/_layout.tsx). Custom fonts must not be
- * combined with `fontWeight` on Android, so weights are separate families.
+ * combined with `fontWeight` on Android, so each weight is its own family.
  */
 export const fonts = {
   display: 'Baloo2_800ExtraBold',
   displayBold: 'Baloo2_700Bold',
-  displaySemi: 'Baloo2_600SemiBold',
   script: 'Caveat_700Bold',
   body: 'DMSans_400Regular',
   bodyMedium: 'DMSans_500Medium',
+  bodySemi: 'DMSans_600SemiBold',
   bodyBold: 'DMSans_700Bold',
+  bodyHeavy: 'DMSans_800ExtraBold',
+  system: undefined as string | undefined,
 };
 
-/** Outline width used on every bordered element (5px @3x). */
-export const BORDER = s(1.7);
-/** Horizontal page padding on onboarding / form screens. */
+/** Page padding on onboarding / form screens. */
 export const H_PAD = s(26);
-/** Horizontal page padding on the main tab screens. */
+/** Page padding on the main tab screens. */
 export const TAB_PAD = s(20);
-/** Offset of the hard "sticker" shadow under buttons and cards. */
-export const HARD_SHADOW = { x: s(5), y: s(6) };
-export const SOFT_SHADOW = { x: s(4), y: s(5) };
+
+/** Hard "sticker" shadows from the design (box-shadow strings). */
+export const shadow = {
+  cta: `${s(5)}px ${s(6)}px 0px ${colors.ink}`,
+  ctaPressed: `${s(2)}px ${s(3)}px 0px ${colors.ink}`,
+  card: `${s(4)}px ${s(5)}px 0px ${colors.ink}`,
+  soft: `${s(4)}px ${s(5)}px 0px rgba(22,35,63,0.15)`,
+  softer: `${s(4)}px ${s(5)}px 0px rgba(22,35,63,0.12)`,
+  chip: `${s(3)}px ${s(4)}px 0px ${colors.ink}`,
+  deep: `${s(5)}px ${s(6)}px 0px rgba(22,35,63,0.2)`,
+  sheetTop: `0px ${-s(8)}px ${s(24)}px rgba(22,35,63,0.08)`,
+  alert: `0px ${s(12)}px ${s(34)}px rgba(0,0,0,0.32)`,
+};

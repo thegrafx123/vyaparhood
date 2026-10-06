@@ -1,12 +1,18 @@
-import { Baloo2_600SemiBold, Baloo2_700Bold, Baloo2_800ExtraBold } from '@expo-google-fonts/baloo-2';
+import { Baloo2_700Bold, Baloo2_800ExtraBold } from '@expo-google-fonts/baloo-2';
 import { Caveat_700Bold } from '@expo-google-fonts/caveat';
-import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
+import {
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_600SemiBold,
+  DMSans_700Bold,
+  DMSans_800ExtraBold,
+} from '@expo-google-fonts/dm-sans';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { envReady } from '../src/lib/env';
 import { initSentry, reportError, Sentry } from '../src/lib/sentry';
@@ -24,7 +30,8 @@ const queryClient = new QueryClient({
   },
 });
 
-const sheet = {
+/** Screens that float over the previous one (their own sheet / dialog animates in). */
+const overlay = {
   presentation: 'transparentModal' as const,
   animation: 'fade' as const,
   contentStyle: { backgroundColor: 'transparent' },
@@ -32,13 +39,14 @@ const sheet = {
 
 function RootLayout() {
   const [loaded, error] = useFonts({
-    Baloo2_600SemiBold,
     Baloo2_700Bold,
     Baloo2_800ExtraBold,
     Caveat_700Bold,
     DMSans_400Regular,
     DMSans_500Medium,
+    DMSans_600SemiBold,
     DMSans_700Bold,
+    DMSans_800ExtraBold,
   });
 
   useEffect(() => {
@@ -49,11 +57,11 @@ function RootLayout() {
 
   if (!envReady) {
     return (
-      <View style={styles.missing}>
-        <Text style={styles.missingTitle}>Supabase keys missing</Text>
-        <Text style={styles.missingBody}>
-          Copy .env.example to .env.development, add your dev project's URL and anon key, then restart
-          `npx expo start --clear`.
+      <View style={{ flex: 1, justifyContent: 'center', padding: s(28), backgroundColor: colors.bg }}>
+        <Text style={{ fontFamily: fonts.display, fontSize: s(24), color: colors.ink }}>Supabase keys missing</Text>
+        <Text style={{ fontFamily: fonts.body, fontSize: s(15), lineHeight: s(22), color: colors.text, marginTop: s(8) }}>
+          Copy .env.example to .env.development, add your dev project's URL and anon key, then restart with `npx expo
+          start --clear`.
         </Text>
       </View>
     );
@@ -71,12 +79,19 @@ function RootLayout() {
                 contentStyle: { backgroundColor: colors.bg },
               }}
             >
-              <Stack.Screen name="index" options={{ animation: 'fade' }} />
+              <Stack.Screen name="index" options={{ animation: 'none' }} />
               <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
-              <Stack.Screen name="(tabs)" options={{ animation: 'fade', gestureEnabled: false }} />
+              <Stack.Screen name="location" options={{ animation: 'fade', gestureEnabled: false }} />
+              <Stack.Screen name="welcome-city" options={{ animation: 'fade' }} />
+              <Stack.Screen name="onboarding/nearby" options={{ animation: 'fade' }} />
+              <Stack.Screen name="auth/notifications" options={{ animation: 'fade', gestureEnabled: false }} />
               <Stack.Screen name="paywall" options={{ gestureEnabled: false }} />
-              <Stack.Screen name="filters" options={sheet} />
-              <Stack.Screen name="send-request/[id]" options={sheet} />
+              <Stack.Screen name="(tabs)" options={{ animation: 'fade', gestureEnabled: false }} />
+              <Stack.Screen name="restore-account" options={{ animation: 'fade', gestureEnabled: false }} />
+              <Stack.Screen name="banned" options={{ animation: 'fade', gestureEnabled: false }} />
+              <Stack.Screen name="filters" options={overlay} />
+              <Stack.Screen name="city-select" options={overlay} />
+              <Stack.Screen name="send-request/[id]" options={overlay} />
             </Stack>
           </AppProvider>
         </AuthProvider>
@@ -86,9 +101,3 @@ function RootLayout() {
 }
 
 export default Sentry.wrap(RootLayout);
-
-const styles = StyleSheet.create({
-  missing: { flex: 1, justifyContent: 'center', padding: s(28), backgroundColor: colors.bg },
-  missingTitle: { fontFamily: fonts.display, fontSize: s(24), color: colors.ink },
-  missingBody: { fontFamily: fonts.body, fontSize: s(16), lineHeight: s(23), color: colors.text, marginTop: s(8) },
-});

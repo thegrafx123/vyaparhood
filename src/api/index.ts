@@ -1,23 +1,25 @@
+import { COUNTRY_CODE } from '../config';
 import { supabase } from '../lib/supabase';
-import { extensionFor, readFileBytes, uploadToBucket } from '../lib/files';
 import {
-  AdminDoc,
   AdminMember,
   AdminReport,
+  BlockedRow,
+  BusinessLocation,
   ChatRow,
   DiscoverParams,
+  DiscoveryContext,
   Me,
   MemberCardData,
   MemberDetail,
   Message,
   MyRating,
   NotificationRow,
+  PlanId,
   ProfileUpdate,
   ReportReason,
   RequestRow,
   SavedRow,
   Stats,
-  VerificationDoc,
 } from './types';
 
 /**
@@ -37,53 +39,57 @@ async function myId() {
   return id;
 }
 
+/** "98765 43210" → "+919876543210" */
+export const toE164 = (tenDigits: string) => `+${COUNTRY_CODE}${tenDigits.replace(/\D/g, '')}`;
+
 /* ------------------------------------------------------------------ */
-/* Auth — email OTP                                                    */
+/* Auth — phone OTP                                                    */
 /* ------------------------------------------------------------------ */
 
 export const auth = {
-  async sendEmailCode(email: string) {
+  async sendCode(tenDigits: string) {
     const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: { shouldCreateUser: true },
+      phone: toE164(tenDigits),
+      options: { shouldCreateUser: true, channel: 'sms' },
     });
     if (error) throw error;
   },
-  async verifyEmailCode(email: string, token: string) {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
-      token,
-      type: 'email',
-    });
+  async verifyCode(tenDigits: string, token: string) {
+    const { data, error } = await supabase.auth.verifyOtp({ phone: toE164(tenDigits), token, type: 'sms' });
     if (error) throw error;
     return data.session;
   },
   async signOut() {
     await supabase.auth.signOut();
   },
-  async deleteAccount() {
-    const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
-    if (error) throw error;
-    await supabase.auth.signOut();
-  },
 };
 
 /* ------------------------------------------------------------------ */
-/* My profile                                                          */
+/* My account                                                          */
 /* ------------------------------------------------------------------ */
+
+export const PHOTO_BUCKET = 'avatars';
+/** The one photo a member may have. The database only allows this path. */
+export const photoPathFor = (uid: string) => `${uid}/avatar.jpg`;
 
 export const me = {
   async fetch(): Promise<Me> {
     const uid = await myId();
-    const [profile, membership, location] = await Promise.all([
+    const [profile, membership, business, settings] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', uid).single(),
       supabase.from('memberships').select('active, plan_id, source, renews_at').eq('user_id', uid).maybeSingle(),
-      supabase.from('user_locations').select('source, pincode, locality, city').eq('user_id', uid).maybeSingle(),
+      supabase
+        .from('business_locations')
+        .select('address_line, locality, pincode, city, placed_by')
+        .eq('user_id', uid)
+        .maybeSingle(),
+      supabase.from('app_settings').select('billing_enabled').maybeSingle(),
     ]);
     return {
       profile: must(profile),
       membership: must(membership),
-      location: must(location),
+      business: must(business) as BusinessLocation | null,
+      billingEnabled: !!(must(settings) as { billing_enabled: boolean } | null)?.billing_enabled,
     };
   },
 
@@ -92,51 +98,78 @@ export const me = {
     must(await supabase.from('profiles').update(patch).eq('id', uid).select('id').single());
   },
 
-  /** Uploads a new profile photo (bytes already read) and returns its storage path. */
-  async uploadPhoto(data: ArrayBuffer, mime = 'image/jpeg') {
+  /** Uploads (or replaces) the member's single photo and returns its path. */
+  async uploadPhoto(jpeg: ArrayBuffer) {
     const uid = await myId();
-    const path = `${uid}/avatar-${Date.now()}.${extensionFor(mime)}`;
-    await uploadToBucket('avatars', path, data, mime);
+    const path = photoPathFor(uid);
+    const { error } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(path, jpeg, { contentType: 'image/jpeg', upsert: true, cacheControl: '300' });
+    if (error) throw error;
     return path;
-  },
-
-  async removeOldPhoto(path: string | null) {
-    if (path) await supabase.storage.from('avatars').remove([path]);
   },
 
   async stats(): Promise<Stats> {
     const rows = must(await supabase.rpc('my_stats'));
     return (rows as Stats[])[0] ?? { connections: 0, requests_sent: 0, rating: null };
   },
+
+  /** Records the plan picked on the paywall while billing is off (beta). */
+  async choosePlan(plan: PlanId) {
+    must(await supabase.rpc('choose_plan', { p_plan: plan }));
+  },
+
+  /** Hides the account now; returns the date it will be deleted for good. */
+  async requestDeletion(): Promise<string> {
+    return must(await supabase.rpc('request_account_deletion')) as string;
+  },
+
+  async cancelDeletion() {
+    must(await supabase.rpc('cancel_account_deletion'));
+  },
 };
 
 /* ------------------------------------------------------------------ */
-/* Location — coordinates go to the server, never to other members     */
+/* Locations — coordinates go to the server, never to other members    */
 /* ------------------------------------------------------------------ */
 
 export const location = {
-  async saveDevice(p: { lat: number; lng: number; geohash: string | null; area: string | null; city: string | null }) {
+  /** Where the phone is now. Only used as the start of MY Nearby search. */
+  async updateLive(p: { lat: number; lng: number; city: string | null; locality: string | null }) {
     must(
-      await supabase.rpc('update_my_location', {
+      await supabase.rpc('update_live_location', {
         p_lat: p.lat,
         p_lng: p.lng,
-        p_geohash: p.geohash,
-        p_source: 'device',
-        p_locality: p.area,
         p_city: p.city,
+        p_locality: p.locality,
       }),
     );
   },
-  async saveManual(p: { pincode: string; locality: string; city: string; line: string }) {
-    must(
-      await supabase.rpc('update_my_location', {
-        p_source: 'manual',
-        p_pincode: p.pincode,
+
+  /** The business address others find me by. Returns how it was placed on the map. */
+  async setBusiness(p: {
+    addressLine: string;
+    locality: string;
+    pincode: string;
+    city: string;
+    lat: number | null;
+    lng: number | null;
+  }): Promise<'device' | 'pincode' | 'none'> {
+    return must(
+      await supabase.rpc('set_business_location', {
+        p_address_line: p.addressLine,
         p_locality: p.locality,
+        p_pincode: p.pincode || null,
         p_city: p.city,
-        p_address_line: p.line || null,
+        p_lat: p.lat,
+        p_lng: p.lng,
       }),
-    );
+    ) as 'device' | 'pincode' | 'none';
+  },
+
+  async context(): Promise<DiscoveryContext> {
+    const rows = must(await supabase.rpc('my_discovery_context')) as DiscoveryContext[];
+    return rows[0] ?? { origin: 'none', live_city: null, business_city: null, has_business_point: false };
   },
 };
 
@@ -149,6 +182,7 @@ export const discover = {
     return must(
       await supabase.rpc('discover_members', {
         p_mode: p.mode,
+        p_city: p.city,
         p_max_km: p.maxKm,
         p_categories: p.categories.length ? p.categories : null,
         p_verified_only: p.verifiedOnly,
@@ -227,8 +261,8 @@ export const safety = {
     const uid = await myId();
     must(await supabase.from('blocks').delete().eq('blocker', uid).eq('blocked', memberId));
   },
-  async blocked(): Promise<{ id: string; full_name: string }[]> {
-    return must(await supabase.rpc('my_blocked')) as { id: string; full_name: string }[];
+  async blocked(): Promise<BlockedRow[]> {
+    return must(await supabase.rpc('my_blocked')) as BlockedRow[];
   },
   async report(memberId: string, reason: ReportReason, details: string) {
     const uid = await myId();
@@ -267,54 +301,18 @@ export const notifications = {
   async list(): Promise<NotificationRow[]> {
     return must(await supabase.rpc('my_notifications')) as NotificationRow[];
   },
-  async markRead(id: number) {
-    must(await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id));
+  async markAllRead(ids: number[]) {
+    if (!ids.length) return;
+    must(await supabase.from('notifications').update({ read_at: new Date().toISOString() }).in('id', ids));
   },
 };
 
 /* ------------------------------------------------------------------ */
-/* Verification documents (private bucket, deleted after 30 days)      */
+/* Signed photo links                                                  */
 /* ------------------------------------------------------------------ */
 
-export const documents = {
-  async list(): Promise<VerificationDoc[]> {
-    return must(
-      await supabase
-        .from('verification_documents')
-        .select('id, kind, storage_path, file_name, status, created_at, delete_after')
-        .is('purged_at', null)
-        .order('created_at', { ascending: false }),
-    ) as VerificationDoc[];
-  },
-  async upload(kind: 'business_proof' | 'gov_id', file: { uri: string; name: string; mimeType: string | null; size: number | null }) {
-    const uid = await myId();
-    const mime = file.mimeType ?? 'application/octet-stream';
-    const path = `${uid}/${kind}-${Date.now()}.${extensionFor(mime, file.name)}`;
-    const bytes = await readFileBytes(file.uri);
-    await uploadToBucket('verification-docs', path, bytes, mime);
-    must(
-      await supabase.from('verification_documents').insert({
-        user_id: uid,
-        kind,
-        storage_path: path,
-        file_name: file.name.slice(0, 200),
-        mime_type: mime,
-        size_bytes: file.size ?? bytes.byteLength,
-      }),
-    );
-  },
-  async remove(doc: VerificationDoc) {
-    await supabase.storage.from('verification-docs').remove([doc.storage_path]);
-    must(await supabase.from('verification_documents').delete().eq('id', doc.id));
-  },
-};
-
-/* ------------------------------------------------------------------ */
-/* Signed photo / document links                                       */
-/* ------------------------------------------------------------------ */
-
-export async function signedUrl(bucket: 'avatars' | 'verification-docs', path: string, seconds = 3600) {
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, seconds);
+export async function signedUrl(path: string, seconds = 3600) {
+  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, seconds);
   if (error) throw error;
   return data.signedUrl;
 }
@@ -324,12 +322,6 @@ export async function signedUrl(bucket: 'avatars' | 'verification-docs', path: s
 /* ------------------------------------------------------------------ */
 
 export const admin = {
-  async pendingDocs(): Promise<AdminDoc[]> {
-    return must(await supabase.rpc('admin_pending_documents')) as AdminDoc[];
-  },
-  async review(userId: string, approve: boolean) {
-    must(await supabase.rpc('admin_review_member', { p_user: userId, p_approve: approve }));
-  },
   async reports(): Promise<AdminReport[]> {
     return must(await supabase.rpc('admin_list_reports')) as AdminReport[];
   },
@@ -347,5 +339,8 @@ export const admin = {
   },
   async setAdmin(userId: string, isAdmin: boolean) {
     must(await supabase.rpc('admin_set_admin', { p_user: userId, p_admin: isAdmin }));
+  },
+  async setBilling(enabled: boolean) {
+    must(await supabase.rpc('admin_set_billing', { p_enabled: enabled }));
   },
 };

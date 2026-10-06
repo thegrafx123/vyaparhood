@@ -1,8 +1,8 @@
 import React from 'react';
-import { LegalPage } from '../../src/components/LegalPage';
-import { DOCUMENT_RETENTION_DAYS } from '../../src/config';
+import { DELETE_AFTER_DAYS, PRIVACY_EMAIL } from '../../src/config';
+import { LegalPage } from '../../src/features/LegalPage';
 
-/** 33 · Privacy Policy. Location and document lines added to match how the app works. */
+/** 31 · Privacy Policy. Written to match exactly what the app stores. */
 export default function Privacy() {
   return (
     <LegalPage
@@ -11,27 +11,31 @@ export default function Privacy() {
       sections={[
         {
           title: 'What we collect',
-          body: 'Your name, phone number, email, date of birth, city, business details, verification documents, any photos you upload, and your location while you use the app (or the address you enter if location is off).',
+          body: "Your mobile number, name, email, date of birth, city, business details and business address, one profile photo, and — only if you allow it — your phone's location while you use the app. We don't collect ID documents.",
         },
         {
-          title: 'How we use it',
-          body: 'To verify your identity, match you with relevant members nearby, and keep the community safe from fake accounts and abuse.',
+          title: 'How we use your location',
+          body: 'Your business address is how members nearby find your business. Your live location is used only as the starting point of your own Nearby search. Other members only ever see your area and an approximate distance — never your address, your live location or coordinates.',
+        },
+        {
+          title: 'How we use the rest',
+          body: 'To verify your phone number, show you relevant members, and keep the community safe from fake accounts and abuse.',
         },
         {
           title: 'What we share',
-          body: 'Your profile is visible to other verified members in your city. Other members only see how far away you are — never your location, exact address, ID documents or DOB. We never sell your data.',
+          body: 'Other members can see your name, photo, what you are building, your area and city. Your Instagram / LinkedIn handle is shared only with members you connect with. Your phone number, email, date of birth, address and location are never shown to other members. We never sell your data.',
         },
         {
-          title: 'Verification documents',
-          body: `Business proof and ID documents are used only for manual verification, stored encrypted, and permanently deleted within ${DOCUMENT_RETENTION_DAYS} days of submission. For Aadhaar we accept the masked version only.`,
+          title: 'Your photo',
+          body: 'We keep a single profile photo, stored privately and shown only to signed-in members. Uploading a new one replaces the old one.',
         },
         {
           title: 'Your choices',
-          body: 'You can edit, download or delete your profile anytime from Settings. Deleting your account removes your data within 30 days.',
+          body: `You can edit your profile anytime. Deleting your account from Settings hides it immediately and permanently erases your data after ${DELETE_AFTER_DAYS} days — log back in before then to restore it.`,
         },
         {
           title: 'Contact us',
-          body: 'Questions about your data? Reach us at privacy@vyaparhood.com',
+          body: `Questions about your data? Reach us at ${PRIVACY_EMAIL}`,
         },
       ]}
     />

@@ -1,7 +1,7 @@
 import React from 'react';
-import { LegalPage } from '../../src/components/LegalPage';
+import { LegalPage } from '../../src/features/LegalPage';
 
-/** 31 · Community Guidelines. */
+/** 29 · Community Guidelines. */
 export default function Guidelines() {
   return (
     <LegalPage
@@ -10,7 +10,7 @@ export default function Guidelines() {
       sections={[
         {
           title: 'Be real',
-          body: "Use your real name and photo, and represent your business accurately. Verification exists so members can trust who they're talking to.",
+          body: 'Use your real name and a real photo of yourself, and describe your business and its address accurately. Every member verifies their phone number, so people know they are talking to a real person.',
         },
         {
           title: 'Be respectful',
@@ -23,6 +23,10 @@ export default function Guidelines() {
         {
           title: 'No spam or solicitation',
           body: "Don't mass-message members with unsolicited offers, MLM pitches or unrelated promotions.",
+        },
+        {
+          title: 'Meet safely',
+          body: 'Meet in public places for first meetups, and never share OTPs, passwords or payment details in chat.',
         },
         {
           title: "Report what's wrong",

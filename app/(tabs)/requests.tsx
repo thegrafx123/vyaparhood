@@ -1,112 +1,135 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { friendlyError } from '../../src/api/errors';
 import { useRequests, useRespondRequest, useWithdrawRequest } from '../../src/api/hooks';
 import { RequestRow } from '../../src/api/types';
-import { OutlineButton } from '../../src/components/Buttons';
-import { Segmented } from '../../src/components/Controls';
-import { Screen, SoftCard } from '../../src/components/Layout';
-import { MemberAvatar } from '../../src/components/MemberAvatar';
-import { colors, fonts, s, TAB_PAD } from '../../src/theme/tokens';
+import { FadeUp, PressScale } from '../../src/motion';
+import { colors, fonts, s, shadow, TAB_PAD } from '../../src/theme/tokens';
 import { type as t } from '../../src/theme/typography';
 import { timeAgo } from '../../src/utils/time';
-import { firstName } from '../../src/utils/validation';
+import { MemberPhoto } from '../../src/ui/Avatar';
+import { PillButton } from '../../src/ui/Buttons';
+import { Empty, Loading } from '../../src/ui/Cards';
+import { Segmented } from '../../src/ui/Form';
+import { Screen } from '../../src/ui/Screen';
 
-/** 21 · Requests. Accepting creates the connection and opens the chat. */
+/** 19 · Requests — incoming (accept / decline) and outgoing (withdraw). */
 export default function Requests() {
-  const router = useRouter();
-  const { data = [], isLoading, refetch, isRefetching } = useRequests();
-  const respond = useRespondRequest();
-  const withdraw = useWithdrawRequest();
+  const [tab, setTab] = useState<'incoming' | 'outgoing'>('incoming');
+  const { data = [], isLoading, error, refetch, isRefetching } = useRequests();
   const incoming = data.filter((r) => r.direction === 'incoming');
   const outgoing = data.filter((r) => r.direction === 'outgoing');
-  const [tab, setTab] = useState<'incoming' | 'outgoing'>('incoming');
   const list = tab === 'incoming' ? incoming : outgoing;
-
-  const accept = (r: RequestRow) =>
-    respond.mutate(
-      { requestId: r.id, accept: true },
-      {
-        onSuccess: (connectionId) => connectionId && router.push(`/chat/${connectionId}`),
-        onError: (e) => Alert.alert("Couldn't accept", friendlyError(e)),
-      },
-    );
 
   return (
     <Screen>
-      <Text style={[t.pageTitle, styles.title]}>Requests</Text>
-      <Segmented
-        style={{ marginHorizontal: TAB_PAD, marginTop: s(14) }}
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 'incoming', label: `Incoming (${incoming.length})` },
-          { value: 'outgoing', label: `Outgoing (${outgoing.length})` },
-        ]}
-      />
+      <FadeUp delay={20} style={{ paddingHorizontal: TAB_PAD, paddingTop: s(22) }}>
+        <Text style={t.pageTitle} accessibilityRole="header">
+          Requests
+        </Text>
+      </FadeUp>
+      <FadeUp delay={80} style={{ marginHorizontal: TAB_PAD, marginTop: s(16) }}>
+        <Segmented
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'incoming', label: `Incoming (${incoming.length})` },
+            { value: 'outgoing', label: `Outgoing (${outgoing.length})` },
+          ]}
+        />
+      </FadeUp>
       <ScrollView
-        contentContainerStyle={styles.list}
+        contentContainerStyle={{ paddingHorizontal: TAB_PAD, paddingTop: s(16), paddingBottom: s(30), gap: s(14) }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.blue} />}
       >
-        {isLoading && <ActivityIndicator style={{ marginTop: s(30) }} color={colors.blue} />}
-        {list.map((r) => (
-          <SoftCard key={r.id} radius={s(26)} style={{ marginBottom: s(16) }} innerStyle={{ padding: s(16) }}>
-            <Pressable style={styles.row} onPress={() => router.push(`/member/${r.member_id}`)}>
-              <MemberAvatar path={r.member_photo} size={s(48)} radius={s(14)} />
-              <View style={{ flex: 1, marginLeft: s(14) }}>
-                <Text style={t.name}>{r.member_name}</Text>
-                <Text style={styles.role}>{r.member_headline}</Text>
-              </View>
-            </Pressable>
-            <View style={styles.note}>
-              <Text style={styles.noteText}>"{r.note}"</Text>
-            </View>
-            {r.direction === 'incoming' ? (
-              <View style={styles.actions}>
-                <OutlineButton
-                  label="Decline"
-                  onPress={() => respond.mutate({ requestId: r.id, accept: false })}
-                  style={{ flex: 1 }}
-                />
-                <OutlineButton label="Accept" fill={colors.lime} onPress={() => accept(r)} style={{ flex: 1, marginLeft: s(12) }} />
-              </View>
-            ) : (
-              <View style={[styles.actions, { alignItems: 'center' }]}>
-                <Text style={[t.helper, { flex: 1, fontSize: s(13.5) }]}>
-                  Waiting for {firstName(r.member_name)} · {timeAgo(r.created_at)}
-                </Text>
-                <OutlineButton label="Withdraw" height={s(40)} onPress={() => withdraw.mutate(r.id)} />
-              </View>
-            )}
-          </SoftCard>
+        {isLoading ? <Loading /> : null}
+        {error ? <Empty title="Couldn't load requests" body={friendlyError(error)} /> : null}
+        {!isLoading && !error && list.length === 0 ? (
+          <Empty
+            title={tab === 'incoming' ? 'No new requests' : 'Nothing pending'}
+            body={tab === 'incoming' ? 'When someone wants to connect, their note shows up here.' : 'Requests you send wait here until they reply.'}
+          />
+        ) : null}
+        {list.map((r, i) => (
+          <RequestCard key={r.id} r={r} delay={160 + Math.min(i, 6) * 60} />
         ))}
-        {!isLoading && list.length === 0 && (
-          <View style={styles.empty}>
-            <Text style={[t.bodyInk, { textAlign: 'center' }]}>
-              {tab === 'incoming'
-                ? 'No new requests. Members who want to connect will show up here.'
-                : "You haven't sent any requests yet."}
-            </Text>
-            {tab === 'outgoing' && (
-              <Pressable onPress={() => router.navigate('/discover')} style={{ marginTop: s(10) }}>
-                <Text style={t.link}>Find people on Discover</Text>
-              </Pressable>
-            )}
-          </View>
-        )}
       </ScrollView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  title: { paddingHorizontal: TAB_PAD, paddingTop: s(16) },
-  list: { paddingHorizontal: TAB_PAD, paddingTop: s(18), paddingBottom: s(24) },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  role: { fontFamily: fonts.body, fontSize: s(15), color: colors.text },
-  note: { backgroundColor: '#F1F5FD', borderRadius: s(16), padding: s(14), marginTop: s(14) },
-  noteText: { fontFamily: fonts.body, fontSize: s(15.5), lineHeight: s(22), color: '#4A5670' },
-  actions: { flexDirection: 'row', marginTop: s(14) },
-  empty: { paddingVertical: s(40), paddingHorizontal: s(20), alignItems: 'center' },
-});
+function RequestCard({ r, delay }: { r: RequestRow; delay: number }) {
+  const router = useRouter();
+  const respond = useRespondRequest();
+  const withdraw = useWithdrawRequest();
+  const [acting, setActing] = useState<'accept' | 'decline' | null>(null);
+
+  const answer = (accept: boolean) => {
+    setActing(accept ? 'accept' : 'decline');
+    respond.mutate(
+      { requestId: r.id, accept },
+      {
+        onSuccess: (conn) => {
+          if (accept && conn) router.push(`/chat/${conn}`);
+        },
+        onError: (e) => Alert.alert('Something went wrong', friendlyError(e)),
+        onSettled: () => setActing(null),
+      },
+    );
+  };
+
+  return (
+    <FadeUp delay={delay}>
+      <View
+        style={{
+          backgroundColor: colors.white,
+          borderWidth: s(2.5),
+          borderColor: colors.ink,
+          borderRadius: s(20),
+          padding: s(14),
+          boxShadow: shadow.soft,
+        }}
+      >
+        <PressScale
+          accessibilityRole="button"
+          accessibilityLabel={`View ${r.member_name}'s profile`}
+          onPress={() => router.push(`/member/${r.member_id}`)}
+          scaleTo={0.98}
+          style={{ flexDirection: 'row', gap: s(12) }}
+        >
+          <MemberPhoto path={r.member_photo} size={s(48)} radius={s(14)} />
+          <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: s(8) }}>
+              <Text numberOfLines={1} style={[t.name, { flexShrink: 1 }]}>
+                {r.member_name}
+              </Text>
+              <Text style={t.small}>{timeAgo(r.created_at)}</Text>
+            </View>
+            <Text numberOfLines={1} style={t.meta}>
+              {r.member_headline}
+            </Text>
+          </View>
+        </PressScale>
+        <View style={{ marginTop: s(10), backgroundColor: colors.inputBg, borderRadius: s(12), paddingVertical: s(10), paddingHorizontal: s(12) }}>
+          <Text style={{ fontFamily: fonts.body, fontSize: s(12.5), lineHeight: s(17.5), color: colors.text }}>"{r.note}"</Text>
+        </View>
+        {r.direction === 'incoming' ? (
+          <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(12) }}>
+            <PillButton label="Decline" style={{ flex: 1 }} loading={acting === 'decline'} disabled={!!acting} onPress={() => answer(false)} />
+            <PillButton label="Accept" tone="lime" style={{ flex: 1 }} loading={acting === 'accept'} disabled={!!acting} onPress={() => answer(true)} />
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(12), alignItems: 'center' }}>
+            <Text style={[t.small, { flex: 1 }]}>Waiting for {r.member_name.split(' ')[0]} to reply</Text>
+            <PillButton
+              label="Withdraw"
+              loading={withdraw.isPending}
+              onPress={() => withdraw.mutate(r.id, { onError: (e) => Alert.alert('Could not withdraw', friendlyError(e)) })}
+            />
+          </View>
+        )}
+      </View>
+    </FadeUp>
+  );
+}

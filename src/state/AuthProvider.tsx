@@ -11,7 +11,8 @@ type AuthValue = {
   ready: boolean;
   session: Session | null;
   userId: string | null;
-  email: string | null;
+  /** E.164 digits from Supabase, e.g. "919876543210". */
+  phone: string | null;
   me: Me | null;
   meLoading: boolean;
   refreshMe: () => Promise<Me | null>;
@@ -55,10 +56,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ready,
       session,
       userId,
-      email: session?.user.email ?? null,
+      phone: session?.user.phone ?? null,
       me: meQuery.data ?? null,
       meLoading: !!userId && meQuery.isLoading,
-      refreshMe: async () => (userId ? qc.fetchQuery({ queryKey: meKey(userId), queryFn: api.me.fetch, staleTime: 0 }) : null),
+      // Reads the session straight from Supabase: right after an OTP is
+      // verified, the `session` state above hasn't caught up yet.
+      refreshMe: async () => {
+        const { data } = await supabase.auth.getSession();
+        const uid = data.session?.user.id ?? null;
+        return uid ? qc.fetchQuery({ queryKey: meKey(uid), queryFn: api.me.fetch, staleTime: 0 }) : null;
+      },
     }),
     [ready, session, userId, meQuery.data, meQuery.isLoading, qc],
   );

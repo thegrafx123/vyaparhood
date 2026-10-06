@@ -16,8 +16,11 @@ export function RealtimeBridge() {
 
   useEffect(() => {
     if (!userId) return;
+    // A fresh name every time: Supabase hands back any existing channel with
+    // the same name, and one left over from before a logout is already
+    // subscribed, so adding listeners to it throws.
     const channel = supabase
-      .channel(`user-${userId}`)
+      .channel(`user-${userId}-${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         addMessageToCache(qc, payload.new as Message);
         qc.invalidateQueries({ queryKey: keys.chats });

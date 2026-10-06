@@ -1,31 +1,26 @@
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
 import { RealtimeBridge } from '../../src/api/RealtimeBridge';
 import { isActiveMember } from '../../src/api/types';
-import { TabBar } from '../../src/components/TabBar';
+import { routeForMe } from '../../src/lib/routing';
+import { useApp } from '../../src/state/AppStore';
 import { useAuth } from '../../src/state/AuthProvider';
-import { colors } from '../../src/theme/tokens';
+import { Loading } from '../../src/ui/Cards';
+import { TabBar } from '../../src/ui/TabBar';
 
-/** The main app is only reachable when signed in with an active membership. */
+/** The main app is only reachable when signed in with access. */
 export default function TabsLayout() {
   const { ready, session, me, meLoading } = useAuth();
+  const { state } = useApp();
 
-  if (!ready || meLoading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.blue} />
-      </View>
-    );
-  }
+  if (!ready || meLoading) return <Loading />;
   if (!session) return <Redirect href="/welcome" />;
-  if (me?.profile.is_banned) return <Redirect href="/banned" />;
-  if (!isActiveMember(me)) return <Redirect href="/paywall" />;
+  if (!isActiveMember(me)) return <Redirect href={routeForMe(me, state.flags) as never} />;
 
   return (
     <>
       <RealtimeBridge />
-      <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...(props as any)} />}>
+      <Tabs screenOptions={{ headerShown: false, animation: 'fade' }} tabBar={(props) => <TabBar {...(props as any)} />}>
         <Tabs.Screen name="discover" />
         <Tabs.Screen name="requests" />
         <Tabs.Screen name="chats" />

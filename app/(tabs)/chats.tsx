@@ -1,85 +1,93 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { friendlyError } from '../../src/api/errors';
 import { useChats } from '../../src/api/hooks';
-import { Search } from '../../src/components/icons';
-import { Screen } from '../../src/components/Layout';
-import { MemberAvatar } from '../../src/components/MemberAvatar';
-import { BORDER, colors, fonts, s, TAB_PAD } from '../../src/theme/tokens';
+import { FadeUp, PressScale } from '../../src/motion';
+import { colors, fonts, s, TAB_PAD } from '../../src/theme/tokens';
 import { type as t } from '../../src/theme/typography';
 import { shortTime } from '../../src/utils/time';
+import { MemberPhoto } from '../../src/ui/Avatar';
+import { Empty, Loading } from '../../src/ui/Cards';
+import { Field } from '../../src/ui/Form';
+import { Search } from '../../src/ui/icons';
+import { Screen } from '../../src/ui/Screen';
 
-/** 22 · Chats. Only accepted connections appear here. Live via Supabase Realtime. */
+/** 20 · Chats — one per accepted connection. */
 export default function Chats() {
   const router = useRouter();
-  const { data = [], isLoading, refetch, isRefetching } = useChats();
-  const [q, setQ] = useState('');
-
-  const rows = data
-    .map((c) => ({ ...c, preview: c.last_body ? (c.last_sender_is_me ? `You: ${c.last_body}` : c.last_body) : 'Say hi 👋' }))
-    .filter((r) => !q || r.member_name.toLowerCase().includes(q.toLowerCase()) || r.preview.toLowerCase().includes(q.toLowerCase()));
+  const { data = [], isLoading, error, refetch, isRefetching } = useChats();
+  const [query, setQuery] = useState('');
+  const list = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? data.filter((c) => c.member_name.toLowerCase().includes(q) || (c.last_body ?? '').toLowerCase().includes(q)) : data;
+  }, [data, query]);
 
   return (
     <Screen>
-      <Text style={[t.pageTitle, styles.title]}>Chats</Text>
-      <View style={styles.search}>
-        <Search size={s(20)} color={colors.text} strokeWidth={2.2} />
-        <TextInput value={q} onChangeText={setQ} placeholder="Search chats" placeholderTextColor={colors.placeholder} style={styles.searchInput} />
-      </View>
+      <FadeUp delay={20} style={{ paddingHorizontal: TAB_PAD, paddingTop: s(22) }}>
+        <Text style={t.pageTitle} accessibilityRole="header">
+          Chats
+        </Text>
+      </FadeUp>
+      <FadeUp delay={80} style={{ paddingHorizontal: TAB_PAD, paddingTop: s(16) }}>
+        <Field
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search chats"
+          left={<Search size={s(16)} color={colors.text} />}
+          boxStyle={{ borderRadius: s(16) }}
+          returnKeyType="search"
+          accessibilityLabel="Search chats"
+        />
+      </FadeUp>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: TAB_PAD, paddingTop: s(14) }}
+        contentContainerStyle={{ paddingHorizontal: s(14), paddingTop: s(10), paddingBottom: s(30), gap: s(4) }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.blue} />}
+        keyboardShouldPersistTaps="handled"
       >
-        {isLoading && <ActivityIndicator style={{ marginTop: s(30) }} color={colors.blue} />}
-        {rows.map((c) => (
-          <Pressable
-            key={c.connection_id}
-            style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-            onPress={() => router.push(`/chat/${c.connection_id}`)}
-          >
-            <MemberAvatar path={c.member_photo} size={s(52)} radius={s(15)} />
-            <View style={{ flex: 1, marginLeft: s(14) }}>
-              <View style={styles.line}>
-                <Text style={[t.name, { flex: 1 }]} numberOfLines={1}>
-                  {c.member_name}
+        {isLoading ? <Loading /> : null}
+        {error ? <Empty title="Couldn't load chats" body={friendlyError(error)} /> : null}
+        {!isLoading && !error && data.length === 0 ? (
+          <Empty title="No chats yet" body="Chat unlocks when someone accepts your request — or you accept theirs." />
+        ) : null}
+        {list.map((c, i) => (
+          <FadeUp key={c.connection_id} delay={160 + Math.min(i, 8) * 50}>
+            <PressScale
+              accessibilityRole="button"
+              accessibilityLabel={`Chat with ${c.member_name}${c.unread ? ', unread' : ''}`}
+              onPress={() => router.push(`/chat/${c.connection_id}`)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: s(12), padding: s(12), borderRadius: s(18) }}
+            >
+              <MemberPhoto path={c.member_photo} size={s(52)} radius={s(16)} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: s(8) }}>
+                  <Text numberOfLines={1} style={{ fontFamily: fonts.displayBold, fontSize: s(14.5), color: colors.ink, flexShrink: 1 }}>
+                    {c.member_name}
+                  </Text>
+                  <Text style={{ fontFamily: fonts.body, fontSize: s(11), color: colors.muted }}>{shortTime(c.last_at)}</Text>
+                </View>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontFamily: c.unread ? fonts.bodyBold : fonts.body,
+                    fontSize: s(12.5),
+                    color: c.unread ? colors.ink : colors.text,
+                    marginTop: s(2),
+                  }}
+                >
+                  {!c.available
+                    ? 'This member is no longer available'
+                    : c.last_body
+                      ? `${c.last_sender_is_me ? 'You: ' : ''}${c.last_body}`
+                      : 'Say hello 👋'}
                 </Text>
-                <Text style={styles.time}>{shortTime(c.last_at)}</Text>
               </View>
-              <Text style={styles.preview} numberOfLines={1}>
-                {c.preview}
-              </Text>
-            </View>
-            {c.unread ? <View style={styles.unread} /> : <View style={{ width: s(10) }} />}
-          </Pressable>
+              {c.unread && <View style={{ width: s(8), height: s(8), borderRadius: s(4), backgroundColor: colors.peach }} />}
+            </PressScale>
+          </FadeUp>
         ))}
-        {!isLoading && rows.length === 0 && (
-          <Text style={[t.bodyInk, { textAlign: 'center', marginTop: s(40) }]}>
-            {q ? 'No chats match that search.' : 'Chats appear here once someone accepts your request.'}
-          </Text>
-        )}
       </ScrollView>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  title: { paddingHorizontal: TAB_PAD, paddingTop: s(16) },
-  search: {
-    marginHorizontal: TAB_PAD,
-    marginTop: s(14),
-    height: s(50),
-    borderRadius: s(25),
-    borderWidth: BORDER,
-    borderColor: colors.ink,
-    backgroundColor: colors.white,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: s(18),
-  },
-  searchInput: { flex: 1, marginLeft: s(12), fontFamily: fonts.body, fontSize: s(17), color: colors.ink, paddingVertical: 0 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: s(12) },
-  line: { flexDirection: 'row', alignItems: 'center' },
-  time: { fontFamily: fonts.body, fontSize: s(14), color: colors.textMuted, marginLeft: s(8) },
-  preview: { fontFamily: fonts.body, fontSize: s(16), color: '#4B5770', marginTop: s(1) },
-  unread: { width: s(9), height: s(9), borderRadius: s(5), backgroundColor: colors.alert, marginLeft: s(10) },
-});

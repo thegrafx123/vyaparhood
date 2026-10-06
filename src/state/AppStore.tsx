@@ -1,32 +1,21 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { SortBy } from '../api/types';
 import { CategoryId, DEFAULT_DISTANCE_KM } from '../config';
 import { Coords } from '../services/location';
 
 /**
- * Device-only state that never needs to be on the server as-is:
- * this session's location reading, the city picked during sign-up,
- * and Discover filters. Everything else comes from Supabase.
+ * Device-only state: this session's live location reading, Discover
+ * filters, and a few "have we already shown this?" flags kept on the
+ * phone. Everything else comes from Supabase.
  */
 
-export interface ManualAddress {
-  pincode: string;
-  locality: string;
-  city: string;
-  line: string;
-}
-
-export interface LocationState {
+export interface LiveState {
   status: 'unknown' | 'granted' | 'denied' | 'unavailable';
-  source: 'device' | 'manual' | null;
   coords: Coords | null;
-  geohash: string | null;
-  detectedCity: string | null;
-  detectedArea: string | null;
-  manualAddress: ManualAddress | null;
-  canAskAgain: boolean;
+  city: string | null;
+  area: string | null;
 }
-
-export type SortBy = 'nearest' | 'newest' | 'rating';
 
 export interface Filters {
   distanceKm: number;
@@ -42,37 +31,65 @@ export const DEFAULT_FILTERS: Filters = {
   verifiedOnly: false,
 };
 
+/** Remembered on the phone between launches. */
+export interface Flags {
+  /** Slide 2b ("Your Surat business, sorted") is shown only once. */
+  cityIntroShown: boolean;
+  /** The member said no in our location dialog; don't ask on every launch. */
+  locationDeclined: boolean;
+  /** Slide 13 (notifications) has been shown. */
+  notificationsPrompted: boolean;
+}
+
+const DEFAULT_FLAGS: Flags = { cityIntroShown: false, locationDeclined: false, notificationsPrompted: false };
+const FLAGS_KEY = 'vh.flags.v1';
+
 interface AppState {
-  location: LocationState;
-  city: string | null;
+  live: LiveState;
   filters: Filters;
-  filtersApplied: boolean;
+  discoverMode: 'nearby' | 'citywide';
+  /** City shown in Citywide; null = the member's own. */
+  discoverCity: string | null;
+  flags: Flags;
+  flagsReady: boolean;
 }
 
 const initialState = (): AppState => ({
-  location: {
-    status: 'unknown',
-    source: null,
-    coords: null,
-    geohash: null,
-    detectedCity: null,
-    detectedArea: null,
-    manualAddress: null,
-    canAskAgain: true,
-  },
-  city: null,
+  live: { status: 'unknown', coords: null, city: null, area: null },
   filters: DEFAULT_FILTERS,
-  filtersApplied: false,
+  discoverMode: 'citywide',
+  discoverCity: null,
+  flags: DEFAULT_FLAGS,
+  flagsReady: false,
 });
 
 function useAppState() {
   const [state, setState] = useState<AppState>(initialState);
+
+  useEffect(() => {
+    AsyncStorage.getItem(FLAGS_KEY)
+      .then((raw) => {
+        const saved = raw ? (JSON.parse(raw) as Partial<Flags>) : {};
+        setState((st) => ({ ...st, flags: { ...DEFAULT_FLAGS, ...saved }, flagsReady: true }));
+      })
+      .catch(() => setState((st) => ({ ...st, flagsReady: true })));
+  }, []);
+
   const actions = useMemo(
     () => ({
-      setLocation: (loc: Partial<LocationState>) => setState((s) => ({ ...s, location: { ...s.location, ...loc } })),
-      setCity: (city: string) => setState((s) => ({ ...s, city })),
-      applyFilters: (filters: Filters) => setState((s) => ({ ...s, filters, filtersApplied: true })),
-      reset: () => setState(initialState()),
+      setLive: (live: Partial<LiveState>) => setState((st) => ({ ...st, live: { ...st.live, ...live } })),
+      applyFilters: (filters: Filters) => setState((st) => ({ ...st, filters })),
+      setDiscoverMode: (discoverMode: 'nearby' | 'citywide') => setState((st) => ({ ...st, discoverMode })),
+      setDiscoverCity: (discoverCity: string | null) => setState((st) => ({ ...st, discoverCity })),
+      setFlag: (key: keyof Flags, value: boolean) =>
+        setState((st) => {
+          const flags = { ...st.flags, [key]: value };
+          AsyncStorage.setItem(FLAGS_KEY, JSON.stringify(flags)).catch(() => {});
+          return { ...st, flags };
+        }),
+      /** On sign-out: forget filters, keep device flags. */
+      resetSession: () =>
+        setState((st) => ({ ...initialState(), flags: st.flags, flagsReady: st.flagsReady, live: st.live })),
     }),
     [],
   );

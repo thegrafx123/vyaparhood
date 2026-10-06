@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as api from './index';
 import { useAuth } from '../state/AuthProvider';
+import * as api from './index';
 import { DiscoverParams, isActiveMember, Message, MyRating, ReportReason } from './types';
 
 /**
@@ -9,6 +9,7 @@ import { DiscoverParams, isActiveMember, Message, MyRating, ReportReason } from 
  */
 export const keys = {
   discover: (p: DiscoverParams) => ['discover', p] as const,
+  context: ['discoveryContext'] as const,
   member: (id: string) => ['member', id] as const,
   requests: ['requests'] as const,
   chats: ['chats'] as const,
@@ -17,9 +18,8 @@ export const keys = {
   saved: ['saved'] as const,
   blocked: ['blocked'] as const,
   stats: ['stats'] as const,
-  documents: ['documents'] as const,
   myRating: (id: string) => ['myRating', id] as const,
-  signed: (bucket: string, path: string) => ['signed', bucket, path] as const,
+  signed: (path: string) => ['signed', path] as const,
   admin: (part: string, q = '') => ['admin', part, q] as const,
 };
 
@@ -31,6 +31,11 @@ function useMemberGate() {
 export function useDiscover(p: DiscoverParams, enabled = true) {
   const member = useMemberGate();
   return useQuery({ queryKey: keys.discover(p), queryFn: () => api.discover.list(p), enabled: member && enabled });
+}
+
+export function useDiscoveryContext() {
+  const member = useMemberGate();
+  return useQuery({ queryKey: keys.context, queryFn: api.location.context, enabled: member });
 }
 
 export function useMember(id: string | undefined) {
@@ -73,20 +78,17 @@ export function useStats() {
   return useQuery({ queryKey: keys.stats, queryFn: api.me.stats });
 }
 
-export function useDocuments() {
-  return useQuery({ queryKey: keys.documents, queryFn: api.documents.list });
-}
-
 export function useMyRating(memberId: string | undefined) {
   return useQuery({ queryKey: keys.myRating(memberId ?? ''), queryFn: () => api.safety.myRating(memberId!), enabled: !!memberId });
 }
 
 /** Short-lived link for a private photo. Cached for 50 minutes (links last 60). */
-export function useSignedUrl(bucket: 'avatars' | 'verification-docs', path: string | null | undefined) {
+export function useSignedUrl(path: string | null | undefined) {
+  const { session } = useAuth();
   return useQuery({
-    queryKey: keys.signed(bucket, path ?? ''),
-    queryFn: () => api.signedUrl(bucket, path!),
-    enabled: !!path,
+    queryKey: keys.signed(path ?? ''),
+    queryFn: () => api.signedUrl(path!),
+    enabled: !!path && !!session,
     staleTime: 50 * 60 * 1000,
     gcTime: 55 * 60 * 1000,
   }).data;

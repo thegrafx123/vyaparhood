@@ -1,110 +1,130 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Hatched } from '../../src/components/Hatched';
-import { Check, Mail } from '../../src/components/icons';
-import { OnboardingPage } from '../../src/components/OnboardingPage';
-import { ShadowBox } from '../../src/components/ShadowBox';
-import { BORDER, colors, fonts, s } from '../../src/theme/tokens';
+import { Image, Text, View } from 'react-native';
+import { FadeUp, Float } from '../../src/motion';
+import { colors, fonts, H_PAD, s, shadow } from '../../src/theme/tokens';
+import { type as t } from '../../src/theme/typography';
+import { CtaButton } from '../../src/ui/Buttons';
+import { PageDots } from '../../src/ui/Form';
+import { BrandRow } from '../../src/ui/Header';
+import { AccentHeading } from '../../src/ui/Heading';
+import { Check, Mail } from '../../src/ui/icons';
+import { Footer, Screen } from '../../src/ui/Screen';
 
-export default function ContextNotColdDms() {
+const RIYA = require('../../assets/images/avatar-girl-glasses.jpg');
+
+/** 4 · Onboarding — connect with context, not cold DMs. */
+export default function OnboardingContext() {
   const router = useRouter();
   return (
-    <OnboardingPage
-      step={2}
-      heading={['Connect with context,', { accent: 'not cold DMs', squiggle: 'lime' }]}
-      subtitle="Add a short note with every request. Chat unlocks once they say yes."
-      cta="Next"
-      onNext={() => router.push('/onboarding/why')}
-    >
-      <View style={{ paddingTop: s(18) }}>
-        <ShadowBox radius={s(28)}>
-          <View style={styles.card}>
-            <View style={styles.row}>
-              <Hatched radius={s(12)} iconSize={s(15)} style={{ width: s(40), height: s(40) }} />
-              <View style={{ marginLeft: s(12) }}>
-                <Text style={styles.small}>Sending a request to</Text>
-                <Text style={styles.name}>Riya Sharma</Text>
+    <Screen texture>
+      <BrandRow onSkip={() => router.push('/auth/phone')} />
+
+      <FadeUp delay={100} style={{ paddingHorizontal: H_PAD, paddingTop: s(24) }}>
+        <AccentHeading parts={['Connect with context,', { accent: 'not cold DMs', drawDelay: 500 }]} size={29} accentSize={34} />
+        <Text style={[t.subtitle, { fontSize: s(14), marginTop: s(10) }]}>
+          Add a short note with every request. Chat unlocks once they say yes.
+        </Text>
+      </FadeUp>
+
+      <View style={{ flex: 1, marginHorizontal: H_PAD, marginTop: s(34) }}>
+        <FadeUp delay={200}>
+          <View
+            style={{
+              backgroundColor: colors.white,
+              borderWidth: s(2.5),
+              borderColor: colors.ink,
+              borderRadius: s(22),
+              padding: s(16),
+              boxShadow: shadow.cta,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10) }}>
+              <Image source={RIYA} style={{ width: s(40), height: s(40), borderRadius: s(12) }} />
+              <View>
+                <Text style={{ fontFamily: fonts.body, fontSize: s(10.5), color: colors.muted }}>Sending a request to</Text>
+                <Text style={{ fontFamily: fonts.displayBold, fontSize: s(13.5), color: colors.ink }}>Riya Sharma</Text>
               </View>
             </View>
-            <View style={styles.note}>
-              <Text style={styles.noteText}>"Hi, I run a small cafe and would love to collaborate on branding."</Text>
+            <View style={{ marginTop: s(12), backgroundColor: colors.inputBg, borderRadius: s(12), paddingVertical: s(10), paddingHorizontal: s(12) }}>
+              <Text style={{ fontFamily: fonts.body, fontSize: s(12.5), lineHeight: s(19), color: colors.ink }}>
+                "Hi, I run a small cafe and would love to collaborate on branding."
+              </Text>
             </View>
           </View>
-        </ShadowBox>
+        </FadeUp>
 
-        <ShadowBox radius={s(18)} offset={{ x: s(4), y: s(5) }} style={styles.pillWrap}>
-          <View style={styles.pill}>
-            <View style={styles.pillIcon}>
-              <Mail size={s(14)} color={colors.blue} strokeWidth={2.2} />
+        <View style={{ position: 'absolute', top: -s(14), right: s(4), transform: [{ rotate: '-5deg' }] }}>
+          <Float distance={7} duration={3400} delay={950} enterDelay={320}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: s(8),
+                backgroundColor: colors.white,
+                borderRadius: s(16),
+                paddingVertical: s(8),
+                paddingLeft: s(8),
+                paddingRight: s(14),
+                borderWidth: s(2.5),
+                borderColor: colors.ink,
+                boxShadow: shadow.card,
+              }}
+            >
+              <View
+                style={{
+                  width: s(22),
+                  height: s(22),
+                  borderRadius: s(8),
+                  backgroundColor: colors.blueSoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Mail size={s(12)} color={colors.blue} sw={2} />
+              </View>
+              <Text style={{ fontFamily: fonts.bodyBold, fontSize: s(12), color: colors.ink }}>No cold DMs</Text>
             </View>
-            <Text style={styles.pillText}>No cold DMs</Text>
-          </View>
-        </ShadowBox>
-
-        <View style={styles.approved}>
-          <View style={styles.approvedIcon}>
-            <Check size={s(14)} color={colors.ink} strokeWidth={3} />
-          </View>
-          <Text style={styles.approvedText}>Connection approved — you can chat now</Text>
+          </Float>
         </View>
+
+        <FadeUp delay={400} style={{ marginTop: s(18) }}>
+          <View
+            style={{
+              backgroundColor: colors.ink,
+              borderRadius: s(18),
+              paddingVertical: s(14),
+              paddingHorizontal: s(16),
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: s(10),
+            }}
+          >
+            <View
+              style={{
+                width: s(24),
+                height: s(24),
+                borderRadius: s(12),
+                backgroundColor: colors.lime,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Check size={s(12)} color={colors.ink} sw={3.4} />
+            </View>
+            <Text style={{ fontFamily: fonts.bodySemi, fontSize: s(12.5), color: colors.white, flex: 1 }}>
+              Connection approved — you can chat now
+            </Text>
+          </View>
+        </FadeUp>
       </View>
-    </OnboardingPage>
+
+      <FadeUp delay={480}>
+        <Footer style={{ alignItems: 'center', gap: s(16), paddingTop: s(18) }}>
+          <PageDots count={4} active={2} />
+          <CtaButton label="Next" onPress={() => router.push('/onboarding/why')} style={{ alignSelf: 'stretch' }} />
+        </Footer>
+      </FadeUp>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: s(28),
-    borderWidth: BORDER,
-    borderColor: colors.ink,
-    backgroundColor: colors.white,
-    padding: s(18),
-    paddingTop: s(22),
-  },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  small: { fontFamily: fonts.body, fontSize: s(13.5), color: colors.textMuted },
-  name: { fontFamily: fonts.display, fontSize: s(17), color: colors.ink, marginTop: -s(1) },
-  note: { backgroundColor: '#F1F5FD', borderRadius: s(16), padding: s(14), marginTop: s(16) },
-  noteText: { fontFamily: fonts.body, fontSize: s(15.5), lineHeight: s(22), color: colors.ink },
-  pillWrap: { position: 'absolute', top: 0, right: -s(4) },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: s(18),
-    borderWidth: BORDER,
-    borderColor: colors.ink,
-    height: s(40),
-    paddingHorizontal: s(10),
-  },
-  pillIcon: {
-    width: s(24),
-    height: s(24),
-    borderRadius: s(7),
-    backgroundColor: colors.blueSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: s(8),
-  },
-  pillText: { fontFamily: fonts.bodyBold, fontSize: s(15), color: colors.ink },
-  approved: {
-    marginTop: s(20),
-    backgroundColor: colors.ink,
-    borderRadius: s(24),
-    height: s(52),
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: s(14),
-  },
-  approvedIcon: {
-    width: s(25),
-    height: s(25),
-    borderRadius: s(13),
-    backgroundColor: colors.lime,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: s(10),
-  },
-  approvedText: { fontFamily: fonts.bodyBold, fontSize: s(15.5), color: colors.white, flexShrink: 1 },
-});

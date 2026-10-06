@@ -1,25 +1,27 @@
 import { StyleSheet } from 'react-native';
 import { colors, fonts, s } from './tokens';
 
+/** Text styles used across the designs. Sizes are design points. */
 export const type = StyleSheet.create({
-  /** Big onboarding / form headings ("Find the right people in your city"). */
-  h1: { fontFamily: fonts.display, fontSize: s(30), lineHeight: s(37), color: colors.ink },
-  /** Tab screen titles ("Discover", "Requests"). */
-  pageTitle: { fontFamily: fonts.display, fontSize: s(31), lineHeight: s(38), color: colors.ink },
-  /** Header titles next to a back button ("Set up your profile"). */
-  headerTitle: { fontFamily: fonts.display, fontSize: s(21), lineHeight: s(28), color: colors.ink },
-  subtitle: { fontFamily: fonts.body, fontSize: s(15.5), lineHeight: s(22.5), color: colors.text },
-  label: { fontFamily: fonts.bodyBold, fontSize: s(15), lineHeight: s(20), color: colors.ink },
-  helper: { fontFamily: fonts.body, fontSize: s(12.5), lineHeight: s(17), color: colors.textMuted },
-  body: { fontFamily: fonts.body, fontSize: s(15.5), lineHeight: s(23), color: colors.text },
-  bodyInk: { fontFamily: fonts.body, fontSize: s(15.5), lineHeight: s(22), color: colors.ink },
-  name: { fontFamily: fonts.display, fontSize: s(17.5), lineHeight: s(23), color: colors.ink },
+  /** Page titles on tab screens ("Discover", "Requests"). */
+  pageTitle: { fontFamily: fonts.display, fontSize: s(26), lineHeight: s(34), color: colors.ink },
+  /** Titles next to a back button ("Set up your profile"). */
+  headerTitle: { fontFamily: fonts.display, fontSize: s(18), lineHeight: s(24), color: colors.ink },
+  subtitle: { fontFamily: fonts.bodyMedium, fontSize: s(13.5), lineHeight: s(20), color: colors.text },
+  label: { fontFamily: fonts.bodyBold, fontSize: s(12), lineHeight: s(16), color: colors.ink },
+  helper: { fontFamily: fonts.body, fontSize: s(10.5), lineHeight: s(14), color: colors.muted },
+  body: { fontFamily: fonts.bodyMedium, fontSize: s(13.5), lineHeight: s(21), color: colors.text },
+  row: { fontFamily: fonts.bodySemi, fontSize: s(13.5), lineHeight: s(18), color: colors.ink },
+  name: { fontFamily: fonts.displayBold, fontSize: s(14.5), lineHeight: s(20), color: colors.ink },
+  meta: { fontFamily: fonts.body, fontSize: s(12), lineHeight: s(16), color: colors.text },
+  small: { fontFamily: fonts.body, fontSize: s(11), lineHeight: s(15), color: colors.muted },
   sectionLabel: {
     fontFamily: fonts.bodyBold,
-    fontSize: s(13),
-    letterSpacing: s(0.8),
-    color: colors.textMuted,
+    fontSize: s(11.5),
+    letterSpacing: s(0.5),
+    color: colors.muted,
+    textTransform: 'uppercase',
   },
-  link: { fontFamily: fonts.displayBold, fontSize: s(16), color: colors.blue },
-  error: { fontFamily: fonts.bodyMedium, fontSize: s(12.5), lineHeight: s(17), color: colors.error },
+  link: { fontFamily: fonts.bodyBold, fontSize: s(12.5), color: colors.blue },
+  error: { fontFamily: fonts.bodyMedium, fontSize: s(11.5), lineHeight: s(16), color: colors.error },
 });

@@ -1,14 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { OutlineButton, PrimaryButton } from '../../src/components/Buttons';
-import { Radio, TextField } from '../../src/components/Controls';
-import { Divider, HeaderRow, KeyboardArea, Screen, SoftCard } from '../../src/components/Layout';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { friendlyError } from '../../src/api/errors';
 import { useBlock, useMember, useReport } from '../../src/api/hooks';
 import { ReportReason } from '../../src/api/types';
+import { FadeUp } from '../../src/motion';
 import { colors, fonts, H_PAD, s } from '../../src/theme/tokens';
 import { type as t } from '../../src/theme/typography';
+import { CtaButton, PillButton } from '../../src/ui/Buttons';
+import { Field, Helper, Radio } from '../../src/ui/Form';
+import { HeaderRow } from '../../src/ui/Header';
+import { KeyboardArea, Screen } from '../../src/ui/Screen';
 
 const REASONS: { id: ReportReason; label: string }[] = [
   { id: 'fake', label: 'Fake profile or scam' },
@@ -18,118 +20,119 @@ const REASONS: { id: ReportReason; label: string }[] = [
   { id: 'other', label: 'Something else' },
 ];
 
-/** 25 · Report or block. */
-export default function ReportOrBlock() {
-  const router = useRouter();
+/** 23 · Report or block a member. */
+export default function ReportBlock() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: member } = useMember(String(id));
+  const router = useRouter();
+  const { data: m } = useMember(id);
   const report = useReport();
-  const blockMember = useBlock();
-  const [reason, setReason] = useState(0);
+  const block = useBlock();
+  const [reason, setReason] = useState<ReportReason>('fake');
   const [details, setDetails] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const name = m?.full_name ?? 'this member';
 
-  if (!member) return null;
-
-  const leaveToDiscover = () => {
-    if (router.canDismiss()) router.dismissAll();
-    router.navigate('/discover');
-  };
-
-  const submit = () =>
+  const submit = () => {
+    if (!id) return;
+    setError(null);
     report.mutate(
-      { memberId: member.id, reason: REASONS[reason].id, details: details.trim() },
+      { memberId: id, reason, details: details.trim() },
       {
         onSuccess: () =>
-          Alert.alert('Report submitted', 'Our safety team will review it within 24 hours. Thank you for flagging it.', [
+          Alert.alert('Report sent', 'Thanks for telling us. Our safety team reviews every report within 24 hours.', [
             { text: 'OK', onPress: () => router.back() },
           ]),
-        onError: (e) => Alert.alert("Couldn't submit", friendlyError(e)),
+        onError: (e) => setError(friendlyError(e)),
       },
     );
+  };
 
-  const block = () =>
-    Alert.alert(
-      `Block ${member.full_name}?`,
-      "They won't be able to see you or message you, and they'll be removed from your Discover feed and chats.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Block',
-          style: 'destructive',
-          onPress: () =>
-            blockMember.mutate(member.id, {
-              onSuccess: leaveToDiscover,
-              onError: (e) => Alert.alert("Couldn't block", friendlyError(e)),
-            }),
-        },
-      ],
-    );
+  const confirmBlock = () => {
+    if (!id) return;
+    Alert.alert(`Block ${name}?`, 'They will disappear from your Discover feed, requests and chats. They are not told.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: () =>
+          block.mutate(id, {
+            onSuccess: () => router.replace('/discover'),
+            onError: (e) => setError(friendlyError(e)),
+          }),
+      },
+    ]);
+  };
 
   return (
-    <Screen>
+    <Screen texture>
       <KeyboardArea>
         <HeaderRow title="Report or block" />
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={[t.subtitle, { fontSize: s(16.5), lineHeight: s(24) }]}>
-            Your report is confidential. Our safety team reviews every submission within 24 hours.
-          </Text>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: H_PAD, paddingTop: s(18), paddingBottom: s(40) }}>
+          <FadeUp delay={60}>
+            <Text style={[t.body, { fontSize: s(13) }]}>
+              Your report is confidential. Our safety team reviews every submission within 24 hours.
+            </Text>
+          </FadeUp>
 
-          <SoftCard radius={s(26)} style={{ marginTop: s(20) }} innerStyle={{ paddingHorizontal: s(20), paddingVertical: s(4) }}>
-            {REASONS.map((r, i) => (
-              <View key={r.id}>
-                {i > 0 && <Divider />}
+          <FadeUp delay={120} style={{ marginTop: s(18) }}>
+            <View
+              accessibilityRole="radiogroup"
+              style={{
+                backgroundColor: colors.white,
+                borderWidth: s(2.5),
+                borderColor: colors.ink,
+                borderRadius: s(18),
+                paddingHorizontal: s(16),
+                paddingVertical: s(4),
+                boxShadow: `${s(4)}px ${s(5)}px 0px rgba(22,35,63,0.12)`,
+              }}
+            >
+              {REASONS.map((r, i) => (
                 <Pressable
-                  style={styles.row}
-                  onPress={() => setReason(i)}
+                  key={r.id}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: reason === i }}
+                  accessibilityState={{ selected: reason === r.id }}
+                  onPress={() => setReason(r.id)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: s(12),
+                    paddingVertical: s(13),
+                    paddingHorizontal: s(4),
+                    borderBottomWidth: i < REASONS.length - 1 ? s(2) : 0,
+                    borderBottomColor: colors.line,
+                  }}
                 >
-                  <Radio selected={reason === i} />
-                  <Text style={styles.reason}>{r.label}</Text>
+                  <Radio selected={reason === r.id} />
+                  <Text style={t.row}>{r.label}</Text>
                 </Pressable>
-              </View>
-            ))}
-          </SoftCard>
+              ))}
+            </View>
+          </FadeUp>
 
-          <TextField
-            containerStyle={{ marginTop: s(22) }}
-            label="Add details"
-            optionalHint="(optional)"
-            placeholder="Tell us what happened..."
-            value={details}
-            onChangeText={setDetails}
-            multiline
-            height={s(104)}
-            maxLength={1000}
-          />
+          <FadeUp delay={200} style={{ marginTop: s(18) }}>
+            <Field
+              label="Add details"
+              optional="(optional)"
+              value={details}
+              onChangeText={setDetails}
+              placeholder="Tell us what happened..."
+              multiline
+              height={s(70)}
+              maxLength={1000}
+            />
+          </FadeUp>
+          {error ? <Helper error>{error}</Helper> : null}
 
-          <PrimaryButton style={{ marginTop: s(24) }} label="Submit report" circle="none" onPress={submit} loading={report.isPending} />
-          <OutlineButton
-            style={{ marginTop: s(16) }}
-            height={s(58)}
-            label="Block this member"
-            textColor={colors.danger}
-            borderColor={colors.danger}
-            borderWidth={s(2.2)}
-            onPress={block}
-          />
-          <Text style={styles.fine}>Blocking also removes this member from your Discover feed and chats.</Text>
+          <FadeUp delay={260} style={{ marginTop: s(22) }}>
+            <CtaButton label="Submit report" circle="none" size="md" onPress={submit} loading={report.isPending} />
+            <PillButton label="Block this member" tone="danger" size="lg" onPress={confirmBlock} loading={block.isPending} style={{ marginTop: s(10) }} />
+            <Text style={{ textAlign: 'center', fontFamily: fonts.body, fontSize: s(11), lineHeight: s(15), color: colors.muted, marginTop: s(12) }}>
+              Blocking also removes this member from your Discover feed and chats.
+            </Text>
+          </FadeUp>
         </ScrollView>
       </KeyboardArea>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { paddingHorizontal: H_PAD, paddingTop: s(22), paddingBottom: s(40) },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: s(15) },
-  reason: { fontFamily: fonts.bodyBold, fontSize: s(16.5), color: colors.ink, marginLeft: s(16) },
-  fine: {
-    fontFamily: fonts.body,
-    fontSize: s(13.5),
-    lineHeight: s(19),
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: s(14),
-  },
-});

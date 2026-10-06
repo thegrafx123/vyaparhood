@@ -1,10 +1,6 @@
 /**
- * Central switches for the prototype. Change behaviour here rather than
- * inside screens.
+ * Central switches. Change behaviour here rather than inside screens.
  */
-
-/** Cities where Vyaparhood is live. Shows the "<City> · Live now" welcome variant. */
-export const LIVE_CITIES = ['Surat', 'Mumbai'];
 
 export const POPULAR_CITIES = [
   'Mumbai',
@@ -44,6 +40,10 @@ export const ALL_CITIES = [
   'Guwahati',
   'Dehradun',
   'Goa',
+  'Noida',
+  'Gurugram',
+  'Thane',
+  'Navi Mumbai',
 ];
 
 export type CategoryId = 'food' | 'fitness' | 'creative' | 'tech' | 'retail';
@@ -56,25 +56,26 @@ export const CATEGORIES: { id: CategoryId; label: string; short: string }[] = [
   { id: 'retail', label: 'Retail', short: 'Retail' },
 ];
 
-export const categoryLabel = (id: CategoryId) =>
-  CATEGORIES.find((c) => c.id === id)?.label ?? id;
+export const categoryLabel = (id: CategoryId | null | undefined) =>
+  CATEGORIES.find((c) => c.id === id)?.label ?? '';
 
-/** OTP length shown in the verify screen. The design uses 4; 6 is safer once the backend exists. */
-/** Email OTP length. Must match Supabase → Auth → Email OTP length (default 6). */
+/** Phone login. Must match Supabase → Auth → Phone → OTP length. */
 export const OTP_LENGTH = 6;
-/** Supabase allows one code per email every 60 seconds by default. */
+/** Supabase allows one SMS per number every 60 seconds by default. */
 export const OTP_RESEND_SECONDS = 60;
+export const COUNTRY_CODE = '91';
 
-
-/** Verification documents. Flip to true when business proof becomes mandatory. */
-export const REQUIRE_BUSINESS_PROOF = false;
-export const DOCUMENT_RETENTION_DAYS = 30;
-export const MAX_DOCUMENT_MB = 10;
-export const MASKED_AADHAAR_URL = 'https://myaadhaar.uidai.gov.in';
+/** Account deletion grace period. Must match the purge Edge Function. */
+export const DELETE_AFTER_DAYS = 30;
 
 /** Discover defaults. */
 export const DISTANCE_MIN_KM = 0.5;
 export const DISTANCE_MAX_KM = 20;
 export const DEFAULT_DISTANCE_KM = 4.5;
 
+/** Profile photo: one per member, resized before upload. */
+export const PHOTO_SIZE_PX = 720;
+export const PHOTO_JPEG_QUALITY = 0.7;
+
 export const SUPPORT_EMAIL = 'support@vyaparhood.com';
+export const PRIVACY_EMAIL = 'privacy@vyaparhood.com';

@@ -8,13 +8,22 @@ export function friendlyError(e: unknown): string {
   if (anyE?.code === '42501' || /membership required/i.test(msg)) {
     return 'This needs an active membership.';
   }
-  if (/token has expired|invalid otp|otp_expired/i.test(msg)) {
+  if (/token has expired|invalid otp|otp_expired|invalid token/i.test(msg)) {
     return 'That code is wrong or has expired. Request a new one.';
   }
-  if (/rate limit|too many/i.test(msg)) {
+  if (/sms|phone provider|unsupported phone provider|twilio/i.test(msg)) {
+    return "We couldn't send the SMS right now. Please try again in a minute.";
+  }
+  if (/invalid phone|phone.*invalid/i.test(msg)) {
+    return 'Enter a valid 10-digit mobile number.';
+  }
+  if (/rate limit|too many|security purposes/i.test(msg)) {
     return 'Too many attempts. Please wait a minute and try again.';
   }
+  if (/payload too large|exceeded the maximum allowed size/i.test(msg)) {
+    return 'That photo is too large. Try a different one.';
+  }
   // Messages raised by our own database functions are already readable.
-  if (msg && msg.length < 140 && !/violates|syntax|relation|column|function/i.test(msg)) return msg;
+  if (msg && msg.length < 140 && !/violates|syntax|relation|column|function|permission denied/i.test(msg)) return msg;
   return 'Something went wrong. Please try again.';
 }

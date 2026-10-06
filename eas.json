@@ -8,7 +8,7 @@
         "EXPO_PUBLIC_APP_ENV": "development",
         "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR-DEV-REF.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR-DEV-ANON-KEY",
-        "EXPO_PUBLIC_SENTRY_DSN": "YOUR-SENTRY-DSN",
+        "EXPO_PUBLIC_SENTRY_DSN": "",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
@@ -18,7 +18,7 @@
         "EXPO_PUBLIC_APP_ENV": "development",
         "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR-DEV-REF.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR-DEV-ANON-KEY",
-        "EXPO_PUBLIC_SENTRY_DSN": "YOUR-SENTRY-DSN",
+        "EXPO_PUBLIC_SENTRY_DSN": "",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },

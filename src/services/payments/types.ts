@@ -1,56 +1,40 @@
+import { PlanId } from '../../api/types';
+
 /**
  * Payment abstraction.
  *
  * Screens never talk to a payment SDK directly. They call the active
- * `PaymentProvider` (see ./index.ts) and store the resulting `Entitlement`
- * in app state. To go live, write one provider per channel (Apple IAP,
- * Google Play Billing, Cashfree), have each one confirm the purchase with
- * YOUR backend, and return the entitlement the backend reports.
- * No screen code needs to change.
+ * `PaymentProvider` (see ./index.ts). To go live, write one provider per
+ * channel (Apple IAP, Google Play Billing, Cashfree/Razorpay), have each
+ * one confirm the purchase with a Supabase Edge Function (the only thing
+ * allowed to switch memberships.active on), then turn billing on with
+ * `update app_settings set billing_enabled = true;`.
  */
 
-export type BillingPeriod = 'week' | 'month' | 'year';
+export type BillingPeriod = 'week' | 'month';
 
 export interface PlanOffer {
-  id: string;
+  id: PlanId;
   currency: 'INR';
-  /** Introductory price, e.g. ₹99 for the first week. */
-  introPrice: number;
-  introPeriod: BillingPeriod;
-  /** Regular recurring price, e.g. ₹500 per month. */
   price: number;
   period: BillingPeriod;
-  /** Small line under the intro price card. */
-  introNote: string;
-}
-
-export type EntitlementSource = 'none' | 'mock' | 'apple' | 'google' | 'cashfree';
-
-export interface Entitlement {
-  active: boolean;
-  planId: string | null;
-  source: EntitlementSource;
-  /** ISO date the current period ends, if known. */
-  renewsAt: string | null;
+  title: string;
+  /** Small line under the price. */
+  note: string;
+  /** Highlight badge, e.g. "EARLY BIRD". */
+  badge?: string;
+  highlighted?: boolean;
 }
 
 export type PurchaseResult =
-  | { status: 'success'; entitlement: Entitlement }
+  | { status: 'success' }
   | { status: 'cancelled' }
   | { status: 'error'; message: string };
 
 export interface PaymentProvider {
   readonly name: string;
-  getOffer(): Promise<PlanOffer>;
-  purchase(offerId: string): Promise<PurchaseResult>;
-  restore(): Promise<Entitlement>;
+  getPlans(): Promise<PlanOffer[]>;
+  purchase(planId: PlanId): Promise<PurchaseResult>;
   /** Where "Manage membership" should send the user, if anywhere. */
   manageUrl(): string | null;
 }
-
-export const NO_ENTITLEMENT: Entitlement = {
-  active: false,
-  planId: null,
-  source: 'none',
-  renewsAt: null,
-};
