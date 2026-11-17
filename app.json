@@ -27,7 +27,11 @@
       ],
       "blockedPermissions": [
         "ACCESS_BACKGROUND_LOCATION"
-      ]
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#2F6FEA"
+      }
     },
     "plugins": [
       "expo-router",
@@ -83,6 +87,7 @@
     },
     "updates": {
       "url": "https://u.expo.dev/0417cbac-4c11-46d7-a2c5-6bde4774e5db"
-    }
+    },
+    "icon": "./assets/images/icon.png"
   }
 }
