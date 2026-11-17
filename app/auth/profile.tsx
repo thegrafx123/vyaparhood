@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { ProfileForm } from '../../src/features/ProfileForm';
-import { routeForMe } from '../../src/lib/routing';
+import { resetTo, routeForMe } from '../../src/lib/routing';
 import { useApp } from '../../src/state/AppStore';
 import { useAuth } from '../../src/state/AuthProvider';
 import { Loading } from '../../src/ui/Cards';
@@ -24,7 +24,7 @@ export default function CreateProfile() {
             mode="create"
             onSaved={async () => {
               const fresh = await refreshMe();
-              router.replace(routeForMe(fresh, state.flags) as never);
+              resetTo(router, routeForMe(fresh, state.flags));
             }}
           />
         ) : (

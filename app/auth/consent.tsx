@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as api from '../../src/api';
 import { friendlyError } from '../../src/api/errors';
-import { routeForMe } from '../../src/lib/routing';
+import { resetTo, routeForMe } from '../../src/lib/routing';
 import { FadeUp } from '../../src/motion';
 import { useApp } from '../../src/state/AppStore';
 import { useAuth } from '../../src/state/AuthProvider';
@@ -45,7 +45,7 @@ export default function Consent() {
 
   const signOut = async () => {
     await api.auth.signOut();
-    router.replace('/welcome');
+    resetTo(router, '/welcome');
   };
 
   const link = (label: string, href: string) => (

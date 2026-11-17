@@ -1,5 +1,6 @@
 import { COUNTRY_CODE } from '../config';
 import { supabase } from '../lib/supabase';
+import { unregisterPushToken } from '../services/notifications';
 import {
   AdminMember,
   AdminReport,
@@ -43,23 +44,31 @@ async function myId() {
 export const toE164 = (tenDigits: string) => `+${COUNTRY_CODE}${tenDigits.replace(/\D/g, '')}`;
 
 /* ------------------------------------------------------------------ */
-/* Auth — phone OTP                                                    */
+/* Auth — email OTP                                                    */
 /* ------------------------------------------------------------------ */
 
+const normEmail = (email: string) => email.trim().toLowerCase();
+
 export const auth = {
-  async sendCode(tenDigits: string) {
+  /** Emails a 6-digit code. Creates the account on first sign-in. */
+  async sendCode(email: string) {
+    if (__DEV__) console.log('[auth] sending code via', process.env.EXPO_PUBLIC_SUPABASE_URL);
     const { error } = await supabase.auth.signInWithOtp({
-      phone: toE164(tenDigits),
-      options: { shouldCreateUser: true, channel: 'sms' },
+      email: normEmail(email),
+      options: { shouldCreateUser: true },
     });
-    if (error) throw error;
+    if (error) {
+      if (__DEV__) console.warn('[auth] sendCode failed:', error.status, error.code, error.message);
+      throw error;
+    }
   },
-  async verifyCode(tenDigits: string, token: string) {
-    const { data, error } = await supabase.auth.verifyOtp({ phone: toE164(tenDigits), token, type: 'sms' });
+  async verifyCode(email: string, token: string) {
+    const { data, error } = await supabase.auth.verifyOtp({ email: normEmail(email), token, type: 'email' });
     if (error) throw error;
     return data.session;
   },
   async signOut() {
+    await unregisterPushToken();
     await supabase.auth.signOut();
   },
 };
@@ -115,6 +124,11 @@ export const me = {
   },
 
   /** Records the plan picked on the paywall while billing is off (beta). */
+  /** Saves the member's phone number (10 digits, not verified). */
+  async setPhone(tenDigits: string) {
+    must(await supabase.rpc('set_my_phone', { p_phone: tenDigits.replace(/\D/g, '') }));
+  },
+
   async choosePlan(plan: PlanId) {
     must(await supabase.rpc('choose_plan', { p_plan: plan }));
   },

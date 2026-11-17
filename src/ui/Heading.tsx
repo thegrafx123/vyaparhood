@@ -86,12 +86,17 @@ function Accent({
 }) {
   const [width, setWidth] = useState(0);
   const squiggle = part.squiggle === undefined ? 'lime' : part.squiggle;
+  // Caveat's slanted strokes draw past the width the text is measured at,
+  // so the last letter gets clipped. Pad the text box to give the tail
+  // room, and take the same amount back from the gap and the underline so
+  // the layout doesn't change.
+  const tail = accentSize * 0.14;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', marginRight: space }}>
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', marginRight: Math.max(0, space - tail) }}>
       <View>
         <Text
-          onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-          style={[base, { fontFamily: fonts.script, fontSize: accentSize, lineHeight: accentSize * 1.08, color: colors.blue }]}
+          onLayout={(e) => setWidth(e.nativeEvent.layout.width - tail)}
+          style={[base, { fontFamily: fonts.script, fontSize: accentSize, lineHeight: accentSize * 1.08, color: colors.blue, paddingRight: tail }]}
         >
           {part.accent}
         </Text>
@@ -106,7 +111,7 @@ function Accent({
           </View>
         )}
       </View>
-      {part.suffix ? <Text style={base}>{part.suffix}</Text> : null}
+      {part.suffix ? <Text style={[base, { marginLeft: -tail }]}>{part.suffix}</Text> : null}
     </View>
   );
 }

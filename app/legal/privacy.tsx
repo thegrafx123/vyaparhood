@@ -11,7 +11,7 @@ export default function Privacy() {
       sections={[
         {
           title: 'What we collect',
-          body: "Your mobile number, name, email, date of birth, city, business details and business address, one profile photo, and — only if you allow it — your phone's location while you use the app. We don't collect ID documents.",
+          body: "Your email, name, date of birth, city, business details and business address, one profile photo, and — only if you allow it — your phone's location while you use the app. We don't collect ID documents.",
         },
         {
           title: 'How we use your location',
@@ -19,11 +19,11 @@ export default function Privacy() {
         },
         {
           title: 'How we use the rest',
-          body: 'To verify your phone number, show you relevant members, and keep the community safe from fake accounts and abuse.',
+          body: 'To verify your email address, show you relevant members, and keep the community safe from fake accounts and abuse.',
         },
         {
           title: 'What we share',
-          body: 'Other members can see your name, photo, what you are building, your area and city. Your Instagram / LinkedIn handle is shared only with members you connect with. Your phone number, email, date of birth, address and location are never shown to other members. We never sell your data.',
+          body: 'Other members can see your name, photo, what you are building, your area and city. Your Instagram / LinkedIn handle is shared only with members you connect with. Your email, date of birth, address and location are never shown to other members. We never sell your data.',
         },
         {
           title: 'Your photo',

@@ -21,7 +21,7 @@ export default function OnboardingNearby() {
   const router = useRouter();
   return (
     <Screen texture>
-      <BrandRow onSkip={() => router.push('/auth/phone')} />
+      <BrandRow onSkip={() => router.push('/auth/email')} />
 
       <FadeUp delay={100} style={{ paddingHorizontal: H_PAD, paddingTop: s(24) }}>
         <AccentHeading parts={['Find the right people in your', { accent: 'city', drawDelay: 500 }]} size={30} accentSize={36} lineHeight={1.1} />

@@ -11,7 +11,9 @@ type AuthValue = {
   ready: boolean;
   session: Session | null;
   userId: string | null;
-  /** E.164 digits from Supabase, e.g. "919876543210". */
+  /** The address the member signs in with. */
+  email: string | null;
+  /** E.164 digits from Supabase, e.g. "919876543210". Unused until phone login returns. */
   phone: string | null;
   me: Me | null;
   meLoading: boolean;
@@ -56,7 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ready,
       session,
       userId,
-      phone: session?.user.phone ?? null,
+      email: session?.user.email ?? null,
+      phone: session?.user.phone || null,
       me: meQuery.data ?? null,
       meLoading: !!userId && meQuery.isLoading,
       // Reads the session straight from Supabase: right after an OTP is

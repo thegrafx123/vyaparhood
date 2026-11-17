@@ -6,6 +6,7 @@ import { friendlyError } from '../src/api/errors';
 import { PlanId } from '../src/api/types';
 import { FadeUp, PulseDot } from '../src/motion';
 import { payments, PLANS, PlanOffer, rupees } from '../src/services/payments';
+import { PayUCheckout } from '../src/features/PayUCheckout';
 import { useAuth } from '../src/state/AuthProvider';
 import { colors, fonts, H_PAD, s, shadow } from '../src/theme/tokens';
 import { type as t } from '../src/theme/typography';
@@ -14,6 +15,7 @@ import { Helper } from '../src/ui/Form';
 import { AccentHeading } from '../src/ui/Heading';
 import { Check } from '../src/ui/icons';
 import { Blob, Footer, Screen } from '../src/ui/Screen';
+import { resetTo } from '../src/lib/routing';
 
 const BENEFITS = [
   'Full access to verified members in your city',
@@ -47,7 +49,7 @@ export default function Paywall() {
         await api.me.choosePlan(plan);
       }
       await refreshMe();
-      router.replace('/discover');
+      resetTo(router, '/discover');
     } catch (e) {
       setError(friendlyError(e));
     } finally {
@@ -77,7 +79,7 @@ export default function Paywall() {
               <View style={{ width: s(6), height: s(6), borderRadius: s(3), backgroundColor: colors.blue }} />
             </PulseDot>
             <Text style={{ fontFamily: fonts.body, fontSize: s(11), color: colors.muted, flex: 1 }}>
-              {billing ? 'Renews automatically — cancel anytime in Settings' : "We're in beta — no payment needed today"}
+              {billing ? 'One-time payment via PayU — no auto-renewal' : "We're in beta — no payment needed today"}
             </Text>
           </View>
         </FadeUp>
@@ -124,13 +126,14 @@ export default function Paywall() {
           <Text style={{ fontFamily: fonts.body, fontSize: s(11.5), lineHeight: s(16), color: colors.muted, textAlign: 'center' }}>
             {billing
               ? chosen.period === 'month'
-                ? `${rupees(chosen.price)} billed monthly. Cancel anytime in Settings.`
+                ? `${rupees(chosen.price)} for 30 days of full access. Doesn't renew automatically.`
                 : `${rupees(chosen.price)} for 7 days of full access.`
               : "Free during our beta — you won't be charged. We'll ask before any billing starts."}
           </Text>
           <TextButton label="Terms of Service" size={s(11.5)} color={colors.text} onPress={() => router.push('/legal/terms')} />
         </FadeUp>
       </ScrollView>
+      <PayUCheckout />
     </Screen>
   );
 }

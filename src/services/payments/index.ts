@@ -1,4 +1,5 @@
-import { PlanOffer, PaymentProvider, PurchaseResult } from './types';
+import { makePayUProvider } from './payu';
+import { PlanOffer, PaymentProvider } from './types';
 
 /** Single source of truth for the prices shown on the paywall. */
 export const PLANS: PlanOffer[] = [
@@ -25,24 +26,11 @@ export const PLANS: PlanOffer[] = [
 export const rupees = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
 /**
- * Used until a payment gateway is added. It never grants access on its
- * own: with billing off the paywall records the chosen plan (free beta);
- * with billing on, it refuses so nobody can unlock the app from a phone.
+ * PayU (see ./payu.ts). Only used while billing is on
+ * (`update app_settings set billing_enabled = true;`); with billing off
+ * the paywall keeps recording the chosen plan for free (beta).
+ * Prices here are display only — the server charges from its own table.
  */
-const notLiveProvider: PaymentProvider = {
-  name: 'not-live',
-  async getPlans() {
-    return PLANS;
-  },
-  async purchase(): Promise<PurchaseResult> {
-    return { status: 'error', message: "Payments aren't live yet. Please try again soon." };
-  },
-  manageUrl() {
-    return null;
-  },
-};
-
-/** The one line to change when payments go live. */
-export const payments: PaymentProvider = notLiveProvider;
+export const payments: PaymentProvider = makePayUProvider(PLANS);
 
 export * from './types';

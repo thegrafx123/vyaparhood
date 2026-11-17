@@ -16,9 +16,27 @@ select cron.schedule(
   '30 21 * * *',   -- 21:30 UTC = 03:00 IST, daily
   $$
   select net.http_post(
-    url     := 'https://uxhbekxbpittlpymvfam.supabase.co/functions/v1/purge-deleted-accounts',
-    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', '466ba3e45d8e95db81746c3c1ded2fb64b24307b812ee5ee23c6a85de72d973e'),
+    url     :='https://vpsrdoqyuxabadnkizbk.supabase.co/functions/v1/purge-deleted-accounts',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', 'QeNjM50Wdv6kmnGYOEUyIoLXPspa4lq2wDugAc8xRTCZhbB9'),
     body    := '{}'::jsonb
   );
   $$
 );
+
+-- ---------------------------------------------------------------------
+-- Scheduled job: switch off memberships whose plan period has ended.
+-- Run once per project AFTER deploying the expire-memberships Edge
+-- Function. Uses the same <PROJECT_REF> and <CRON_SECRET> as above.
+-- ---------------------------------------------------------------------
+select cron.schedule(
+  'expire-memberships',
+  '35 18 * * *',   -- 18:35 UTC = 00:05 IST, daily
+  $$
+  select net.http_post(
+    url     := 'https://vpsrdoqyuxabadnkizbk.supabase.co/functions/v1/expire-memberships',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', 'QeNjM50Wdv6kmnGYOEUyIoLXPspa4lq2wDugAc8xRTCZhbB9'),
+    body    := '{}'::jsonb
+  );
+  $$
+);
+-- Twice a day instead: use '35 6,18 * * *' (12:05 and 00:05 IST).

@@ -21,6 +21,7 @@ import { Empty, Loading } from '../../src/ui/Cards';
 import { Segmented } from '../../src/ui/Form';
 import { Bell, ChevronDown, Filters, Pin } from '../../src/ui/icons';
 import { Screen } from '../../src/ui/Screen';
+import { normaliseCity } from '../../src/services/location';
 
 /**
  * 15 · Discover (Citywide list) and 15b · Nearby (radar).
@@ -37,7 +38,8 @@ export default function Discover() {
   const f = state.filters;
   const { data: context } = useDiscoveryContext();
 
-  const city = state.discoverCity ?? context?.live_city ?? me?.profile.city ?? null;
+  // Same spelling the database stores, so Citywide matches.
+  const city = normaliseCity(state.discoverCity ?? context?.live_city ?? me?.profile.city ?? null);
 
   const params: DiscoverParams = useMemo(
     () => ({
@@ -127,10 +129,6 @@ export default function Discover() {
           style={{ flexGrow: 0, marginTop: s(14) }}
           contentContainerStyle={{ gap: s(8), paddingHorizontal: TAB_PAD, paddingBottom: s(4), alignItems: 'center' }}
         >
-          <QuickChip label="All" selected={quickAll} onPress={() => setQuick(null)} />
-          {CATEGORIES.map((c) => (
-            <QuickChip key={c.id} label={c.short} selected={f.categories.length === 1 && f.categories[0] === c.id} onPress={() => setQuick(c.id)} />
-          ))}
           <PressScale
             accessibilityRole="button"
             accessibilityLabel="Filters"
@@ -139,13 +137,17 @@ export default function Discover() {
           >
             <Filters size={s(14)} color={colors.white} />
           </PressScale>
+          <QuickChip label="All" selected={quickAll} onPress={() => setQuick(null)} />
+          {CATEGORIES.map((c) => (
+            <QuickChip key={c.id} label={c.short} selected={f.categories.length === 1 && f.categories[0] === c.id} onPress={() => setQuick(c.id)} />
+          ))}
         </ScrollView>
       </FadeUp>
 
       {mode === 'citywide' ? (
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: TAB_PAD, paddingTop: s(16), paddingBottom: s(30), gap: s(14) }}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.blue} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); }} tintColor={colors.blue} />}
         >
           {members.map((m, i) => (
             <MemberCard key={m.id} member={m} delay={160 + Math.min(i, 8) * 60} onPress={() => router.push(`/member/${m.id}`)} />

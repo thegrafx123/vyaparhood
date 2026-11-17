@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useId } from 'react';
-import { KeyboardAvoidingView, Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { KeyboardAvoidingView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg';
 import { colors, H_PAD, s } from '../theme/tokens';
@@ -85,7 +85,7 @@ export function Screen({
 /** Keyboard-aware wrapper for form screens. */
 export function KeyboardArea({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
-    <KeyboardAvoidingView style={[{ flex: 1 }, style]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={[{ flex: 1 }, style]} behavior="padding">
       {children}
     </KeyboardAvoidingView>
   );

@@ -7,6 +7,7 @@ import { H_PAD, s } from '../src/theme/tokens';
 import { type as t } from '../src/theme/typography';
 import { PillButton } from '../src/ui/Buttons';
 import { Screen } from '../src/ui/Screen';
+import { resetTo } from '../src/lib/routing';
 
 /** Shown to suspended accounts. */
 export default function Banned() {
@@ -24,7 +25,7 @@ export default function Banned() {
           size="lg"
           onPress={async () => {
             await api.auth.signOut();
-            router.replace('/welcome');
+            resetTo(router, '/welcome');
           }}
         />
       </View>

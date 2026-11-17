@@ -44,7 +44,7 @@ export type PlanId = 'weekly_99' | 'monthly_299';
 export interface Membership {
   active: boolean;
   plan_id: PlanId | 'granted' | 'root' | null;
-  source: 'none' | 'beta' | 'admin' | 'apple' | 'google' | 'cashfree';
+  source: 'none' | 'beta' | 'admin' | 'apple' | 'google' | 'cashfree' | 'payu';
   renews_at: string | null;
 }
 
@@ -70,7 +70,11 @@ export const isActiveMember = (me: Me | null | undefined) =>
   !me.profile.is_banned &&
   !me.profile.deletion_requested_at &&
   me.profile.onboarding_completed &&
-  (me.profile.is_admin || !me.billingEnabled || !!me.membership?.active);
+  (me.profile.is_admin || hasLiveMembership(me));
+
+/** Membership switched on and, for timed plans, not past its end date. */
+export const hasLiveMembership = (me: Me) =>
+  !!me.membership?.active && (!me.membership.renews_at || new Date(me.membership.renews_at).getTime() > Date.now());
 
 /** Anything the UI can draw a distance / radar pin for. */
 export interface DistanceLike {
@@ -224,6 +228,7 @@ export interface AdminMember {
   id: string;
   full_name: string;
   phone: string | null;
+  email: string | null;
   city: string | null;
   membership_active: boolean;
   is_admin: boolean;

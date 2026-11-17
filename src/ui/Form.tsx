@@ -1,5 +1,5 @@
 import React, { forwardRef, useEffect, useState } from 'react';
-import { Pressable, StyleProp, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, Text, TextInput, TextInputInstance, TextInputProps, View, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Pop, PressScale, Settle } from '../motion';
 import { colors, fonts, s, shadow } from '../theme/tokens';
@@ -40,7 +40,7 @@ type FieldProps = TextInputProps & {
 };
 
 /** `.vh-field` — white box, ink outline, 16 pt corners. */
-export const Field = forwardRef<TextInput, FieldProps>(function Field(
+export const Field = forwardRef<TextInputInstance, FieldProps>(function Field(
   { label, optional, helper, error, left, right, raised, boxStyle, containerStyle, height, multiline, style, onFocus, onBlur, ...input },
   ref,
 ) {

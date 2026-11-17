@@ -5,6 +5,7 @@
 // Protected by a shared secret instead of a user login.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { json } from '../_shared/cors.ts';
+import { withSentry } from '../_shared/sentry.ts';
 
 const url = Deno.env.get('SUPABASE_URL')!;
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -12,7 +13,7 @@ const cronSecret = Deno.env.get('CRON_SECRET');
 
 const GRACE_DAYS = 30;
 
-Deno.serve(async (req) => {
+Deno.serve(withSentry('purge-deleted-accounts', async (req) => {
   if (!cronSecret || req.headers.get('x-cron-secret') !== cronSecret) {
     return json({ error: 'Forbidden' }, 403);
   }
@@ -42,4 +43,4 @@ Deno.serve(async (req) => {
     }
   }
   return json({ deleted, failed: failed.length });
-});
+}));

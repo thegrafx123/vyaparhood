@@ -106,7 +106,7 @@ function MembersTab() {
   return (
     <>
       <View style={{ paddingHorizontal: TAB_PAD, marginTop: s(14) }}>
-        <Field value={q} onChangeText={setQ} placeholder="Search by name or phone" autoCapitalize="none" left={<Search size={s(16)} color={colors.text} />} />
+        <Field value={q} onChangeText={setQ} placeholder="Search by name or email" autoCapitalize="none" left={<Search size={s(16)} color={colors.text} />} />
       </View>
       <ScrollView contentContainerStyle={{ paddingHorizontal: TAB_PAD, paddingTop: s(16), paddingBottom: s(40), gap: s(14) }}>
         {isLoading && <Loading />}
@@ -114,7 +114,7 @@ function MembersTab() {
           <Card key={m.id}>
             <Text style={t.name}>{m.full_name || '(no name yet)'}</Text>
             <Text style={t.meta}>
-              {m.phone ? `+${m.phone}` : 'no phone'} · {m.city ?? 'no city'}
+              {m.email ?? (m.phone ? `+${m.phone}` : 'no email')} · {m.city ?? 'no city'}
             </Text>
             <Text style={t.meta}>
               {m.membership_active ? 'Paid member' : 'No paid membership'}

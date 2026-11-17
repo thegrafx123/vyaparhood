@@ -98,10 +98,10 @@ export default function MyProfile() {
               padV={s(14)}
               onPress={() =>
                 Alert.alert(
-                  verified ? 'Phone verified ✓' : 'Not verified yet',
+                  verified ? 'Email verified ✓' : 'Not verified yet',
                   verified
-                    ? 'Your phone number was verified by OTP when you joined, so your profile shows the green tick.'
-                    : 'Sign in with your phone number to get verified.',
+                    ? 'Your email was verified with a one-time code when you joined, so your profile shows the green tick.'
+                    : 'Sign in with your email to get verified.',
                 )
               }
             />

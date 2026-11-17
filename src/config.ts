@@ -59,9 +59,9 @@ export const CATEGORIES: { id: CategoryId; label: string; short: string }[] = [
 export const categoryLabel = (id: CategoryId | null | undefined) =>
   CATEGORIES.find((c) => c.id === id)?.label ?? '';
 
-/** Phone login. Must match Supabase → Auth → Phone → OTP length. */
+/** Email login. Must match Supabase → Auth → Providers → Email → Email OTP length. */
 export const OTP_LENGTH = 6;
-/** Supabase allows one SMS per number every 60 seconds by default. */
+/** Supabase allows one code per address every 60 seconds by default. */
 export const OTP_RESEND_SECONDS = 60;
 export const COUNTRY_CODE = '91';
 

@@ -10,8 +10,13 @@ android/
 
 # Environment files (keys)
 .env
-.env.*
-!.env.example
+.env.*!.env.example
 # Supabase CLI
 supabase/.temp/
 supabase/.branches/
+
+.env.local
+
+# Local env files with secrets
+dev.env
+prod.env

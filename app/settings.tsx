@@ -7,17 +7,18 @@ import { friendlyError } from '../src/api/errors';
 import { ProfileUpdate } from '../src/api/types';
 import { DELETE_AFTER_DAYS, SUPPORT_EMAIL } from '../src/config';
 import { env } from '../src/lib/env';
+import { reportError, Sentry } from '../src/lib/sentry';
 import { FadeUp } from '../src/motion';
 import { PLANS, rupees } from '../src/services/payments';
 import { useApp } from '../src/state/AppStore';
 import { meKey, useAuth } from '../src/state/AuthProvider';
 import { colors, fonts, s } from '../src/theme/tokens';
-import { formatPhone } from '../src/utils/validation';
 import { TextButton } from '../src/ui/Buttons';
 import { Group, Row, SectionLabel } from '../src/ui/Cards';
 import { Toggle } from '../src/ui/Form';
 import { HeaderRow } from '../src/ui/Header';
 import { Screen } from '../src/ui/Screen';
+import { resetTo } from '../src/lib/routing';
 
 const longDate = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -25,9 +26,11 @@ const longDate = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', mo
 export default function Settings() {
   const router = useRouter();
   const qc = useQueryClient();
-  const { me, userId, phone } = useAuth();
+  const { me, userId, email } = useAuth();
   const { actions } = useApp();
   const [deleting, setDeleting] = useState(false);
+  const [renderCrash, setRenderCrash] = useState(false);
+  if (renderCrash) throw new Error('Sentry test: render crash in Settings');
   const p = me?.profile;
   if (!p || !me) return null;
 
@@ -40,7 +43,6 @@ export default function Settings() {
         ? `Beta · ${rupees(plan.price)}/${plan.period === 'month' ? 'mo' : 'wk'} plan`
         : 'Free beta';
   const verified = p.verification_status === 'verified';
-  const shownPhone = phone ? `+${phone.slice(0, phone.length - 10)} ${formatPhone(phone.slice(-10))}` : '—';
 
   // Optimistic toggle: update the cached profile, then save.
   const setPref = async (patch: ProfileUpdate) => {
@@ -56,7 +58,7 @@ export default function Settings() {
   };
 
   const logOut = () =>
-    Alert.alert('Log out?', 'You can log back in with your phone number anytime.', [
+    Alert.alert('Log out?', 'You can log back in with your email anytime.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Log out',
@@ -64,7 +66,7 @@ export default function Settings() {
         onPress: async () => {
           await api.auth.signOut();
           actions.resetSession();
-          router.replace('/welcome');
+          resetTo(router, '/welcome');
         },
       },
     ]);
@@ -85,7 +87,7 @@ export default function Settings() {
               const until = await api.me.requestDeletion();
               await api.auth.signOut();
               actions.resetSession();
-              router.replace('/welcome');
+              resetTo(router, '/welcome');
               Alert.alert(
                 'Account scheduled for deletion',
                 `It will be permanently deleted on ${longDate(new Date(until))}. Log back in before then if you want to keep it.`,
@@ -106,7 +108,7 @@ export default function Settings() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: s(24), paddingTop: s(8), paddingBottom: s(40) }}>
         <SectionLabel delay={100}>Account</SectionLabel>
         <Group delay={100}>
-          <Row label="Phone number" value={shownPhone} />
+          <Row label="Email" value={email ?? '—'} />
           <Row label="City" value={p.city ?? '—'} onPress={() => router.push('/edit-profile')} />
           <Row
             label="Business address"
@@ -155,6 +157,38 @@ export default function Settings() {
           <Row label="Privacy Policy" onPress={() => router.push('/legal/privacy')} />
           <Row label="Report a problem" onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Problem%20in%20the%20app`)} />
         </Group>
+
+        {__DEV__ || process.env.EXPO_PUBLIC_SENTRY_TEST_MENU === '1' ? (
+          <>
+            <SectionLabel delay={300}>Developer</SectionLabel>
+            <Group delay={300}>
+              <Row
+                label="Sentry: handled error"
+                onPress={() => {
+                  Sentry.captureException(new Error('Sentry test: handled error from Settings'));
+                  Alert.alert('Sent', env.sentryDsn ? 'Check Sentry → Issues in a minute.' : 'No Sentry DSN set, so nothing was sent.');
+                }}
+              />
+              <Row
+                label="Sentry: Supabase error"
+                onPress={() => {
+                  reportError({ message: 'Sentry test: Supabase-style error', code: 'PGRST000' }, { where: 'settings-test' });
+                  Alert.alert('Sent', 'Look for "Supabase-style error" in Sentry.');
+                }}
+              />
+              <Row
+                label="Sentry: unhandled JS error"
+                onPress={() => {
+                  setTimeout(() => {
+                    throw new Error('Sentry test: unhandled JS error');
+                  });
+                }}
+              />
+              <Row label="Sentry: render crash" onPress={() => setRenderCrash(true)} />
+              <Row label="Sentry: native crash (dev build only)" onPress={() => Sentry.nativeCrash()} />
+            </Group>
+          </>
+        ) : null}
 
         <FadeUp delay={340} style={{ alignItems: 'center', marginTop: s(26), gap: s(18) }}>
           <TextButton label="Log out" display size={s(13.5)} color={colors.orange} onPress={logOut} />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FadeTo, SheetUp } from '../motion';
 import { colors, s } from '../theme/tokens';
@@ -36,7 +36,7 @@ export function BottomSheet({
     </>
   );
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <FadeTo to={1} duration={300} style={StyleSheet.absoluteFill}>
         <Pressable
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.backdrop }]}

@@ -41,7 +41,7 @@ export default function Requests() {
       </FadeUp>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: TAB_PAD, paddingTop: s(16), paddingBottom: s(30), gap: s(14) }}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.blue} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); }} tintColor={colors.blue} />}
       >
         {isLoading ? <Loading /> : null}
         {error ? <Empty title="Couldn't load requests" body={friendlyError(error)} /> : null}

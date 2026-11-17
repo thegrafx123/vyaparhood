@@ -43,7 +43,7 @@ export default function Chats() {
       </FadeUp>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: s(14), paddingTop: s(10), paddingBottom: s(30), gap: s(4) }}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.blue} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); }} tintColor={colors.blue} />}
         keyboardShouldPersistTaps="handled"
       >
         {isLoading ? <Loading /> : null}

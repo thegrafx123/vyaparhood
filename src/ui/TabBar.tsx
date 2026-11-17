@@ -12,15 +12,17 @@ const TABS: Record<string, { label: string; Icon: typeof Compass }> = {
   profile: { label: 'Profile', Icon: User },
 };
 
-// Props come from expo-router's <Tabs tabBar={...} />. Typed loosely so this
-// file doesn't depend on react-navigation's internal types.
+// Props come from expo-router's <Tabs tabBar={...} /> (SDK 58 shape: an
+// `emitter` and `navigateToTab` instead of a `navigation` object). Typed
+// loosely so this file doesn't depend on react-navigation's internal types.
 type TabBarProps = {
   state: { index: number; routes: { key: string; name: string }[] };
-  navigation: { navigate: (name: string) => void; emit: (e: any) => any };
+  emitter: { emit: (e: any) => { defaultPrevented?: boolean } | undefined };
+  navigateToTab: (routeKey: string) => void;
 };
 
 /** Bottom tab bar: white, ink top border, active tab in a blue tile. */
-export function TabBar({ state, navigation }: TabBarProps) {
+export function TabBar({ state, emitter, navigateToTab }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const { data: requests } = useRequests();
   const incoming = (requests ?? []).filter((r) => r.direction === 'incoming').length;
@@ -44,8 +46,8 @@ export function TabBar({ state, navigation }: TabBarProps) {
         const focused = state.index === index;
         const { Icon } = tab;
         const onPress = () => {
-          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-          if (!focused && !event?.defaultPrevented) navigation.navigate(route.name);
+          const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!focused && !event?.defaultPrevented) navigateToTab(route.key);
         };
         return (
           <Pressable

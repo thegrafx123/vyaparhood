@@ -1,12 +1,10 @@
 -- =====================================================================
 -- DEV PROJECT ONLY. Never run this on production.
 --
--- Before running, replace 919999999999 (two places below) with the
--- phone number you will test with: country code + number, digits only.
--- Use the same number as a Supabase test number (README, step 1.4) so
--- you can log in without a real SMS.
+-- Before running, replace you@example.com below with the email you
+-- will log in with (lowercase).
 --
---   * Makes that number the root admin.
+--   * Makes that email the root admin.
 --   * Creates 10 demo businesses (not real, can't log in).
 --   * When the root account signs up, it gets demo requests, chats,
 --     saved profiles and notifications, and the demo businesses are kept
@@ -14,9 +12,9 @@
 -- Safe to run more than once.
 -- =====================================================================
 
-insert into public.bootstrap_accounts (phone, make_admin, grant_membership, seed_demo)
-values ('917624828905', true, true, true)
-on conflict (phone) do update
+insert into public.bootstrap_accounts (email, make_admin, grant_membership, seed_demo)
+values ('you@example.com', true, true, true)
+on conflict (email) do update
   set make_admin = true, grant_membership = true, seed_demo = true;
 
 create table if not exists public.dev_demo_members (
@@ -175,6 +173,6 @@ revoke execute on function public.dev_place_demo_near(uuid) from public, anon, a
 revoke execute on function public.dev_seed_relationships(uuid) from public, anon, authenticated;
 
 -- If the root account already signed up before this file was run:
-select public.apply_bootstrap(u.id, u.phone)
+select public.apply_bootstrap(u.id, u.phone, u.email)
 from auth.users u
-where u.phone = '917624828905' and u.phone_confirmed_at is not null;
+where lower(u.email) = 'you@example.com' and u.email_confirmed_at is not null;

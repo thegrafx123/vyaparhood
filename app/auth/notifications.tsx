@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
-import { routeForMe } from '../../src/lib/routing';
-import { requestNotificationPermission } from '../../src/services/notifications';
+import { resetTo, routeForMe } from '../../src/lib/routing';
+import { registerPushToken, requestNotificationPermission } from '../../src/services/notifications';
 import { useApp } from '../../src/state/AppStore';
 import { useAuth } from '../../src/state/AuthProvider';
 import { s } from '../../src/theme/tokens';
@@ -18,11 +18,11 @@ export default function EnableNotifications() {
 
   const finish = () => {
     actions.setFlag('notificationsPrompted', true);
-    router.replace(routeForMe(me, { ...state.flags, notificationsPrompted: true }) as never);
+    resetTo(router, routeForMe(me, { ...state.flags, notificationsPrompted: true }));
   };
 
   const allow = async () => {
-    await requestNotificationPermission();
+    if (await requestNotificationPermission()) registerPushToken();
     finish();
   };
 

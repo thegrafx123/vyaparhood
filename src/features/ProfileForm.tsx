@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import * as api from '../api';
 import { friendlyError } from '../api/errors';
 import { keys } from '../api/hooks';
@@ -9,7 +9,7 @@ import { CATEGORIES, CategoryId } from '../config';
 import { pickPhoto, PickedPhoto } from '../lib/photoPicker';
 import { reportError } from '../lib/sentry';
 import { FadeUp } from '../motion';
-import { geocodeAddress } from '../services/location';
+import { geocodeAddress, normaliseCity } from '../services/location';
 import { colors, fonts, H_PAD, s } from '../theme/tokens';
 import { type as t } from '../theme/typography';
 import { checkDob, digitsOnly, dobBounds, formatDob, isValidEmail, isValidPincode } from '../utils/validation';
@@ -17,7 +17,9 @@ import { MemberPhoto } from '../ui/Avatar';
 import { CtaButton } from '../ui/Buttons';
 import { DateField } from '../ui/DateField';
 import { Chip, Field, Helper, Label, TagInput } from '../ui/Form';
-import { Calendar, Camera, Mail, Pin } from '../ui/icons';
+import { CityPicker } from '../ui/CityPicker';
+import { Calendar, Camera, ChevronDown, Mail, Pin } from '../ui/icons';
+import { BottomSheet } from '../ui/Sheet';
 import { Footer } from '../ui/Screen';
 
 type Errors = Partial<Record<'name' | 'email' | 'dob' | 'headline' | 'category' | 'address' | 'locality' | 'pincode' | 'city' | 'form', string>>;
@@ -53,6 +55,7 @@ export function ProfileForm({
   const [locality, setLocality] = useState(b?.locality ?? p.area ?? '');
   const [pincode, setPincode] = useState(b?.pincode ?? '');
   const [city, setCity] = useState(b?.city ?? p.city ?? '');
+  const [pickingCity, setPickingCity] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [dobRange] = useState(() => dobBounds());
@@ -80,7 +83,7 @@ export function ProfileForm({
     if (address.trim().length < 5) e.address = 'Enter your shop / office address.';
     if (locality.trim().length < 2) e.locality = 'Enter the area, e.g. Bandra West.';
     if (!isValidPincode(pincode)) e.pincode = 'Enter the 6-digit pincode.';
-    if (city.trim().length < 2) e.city = 'Enter your city.';
+    if (city.trim().length < 2) e.city = 'Choose your city.';
     return e;
   };
 
@@ -90,18 +93,20 @@ export function ProfileForm({
     if (Object.keys(e).length) return;
     setBusy(true);
     try {
+      // One spelling per city so Citywide matches ("Bangalore" → "Bengaluru").
+      const cityName = normaliseCity(city) ?? city.trim();
       let photoPath = p.photo_path;
       if (photo) {
         photoPath = await api.me.uploadPhoto(photo.bytes);
         qc.removeQueries({ queryKey: keys.signed(photoPath) });
       }
 
-      const coords = await geocodeAddress({ line: address.trim(), locality: locality.trim(), city: city.trim(), pincode });
+      const coords = await geocodeAddress({ line: address.trim(), locality: locality.trim(), city: cityName, pincode });
       const placedBy = await api.location.setBusiness({
         addressLine: address.trim(),
         locality: locality.trim(),
         pincode,
-        city: city.trim(),
+        city: cityName,
         lat: coords?.lat ?? null,
         lng: coords?.lng ?? null,
       });
@@ -121,7 +126,7 @@ export function ProfileForm({
         bio: bio.trim(),
         offers,
         looking_for: lookingFor,
-        city: city.trim(),
+        city: cityName,
         area: locality.trim(),
         photo_path: photoPath,
         ...(mode === 'create' ? { onboarding_completed: true } : null),
@@ -203,12 +208,13 @@ export function ProfileForm({
             value={email}
             onChangeText={setEmail}
             placeholder="you@email.com"
+            editable={!p.email}
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
             textContentType="emailAddress"
             left={<Mail size={s(15)} color={colors.blue} />}
-            helper="We'll send booking & billing updates here"
+            helper={p.email ? 'Your login email — verified when you signed in' : "We'll send booking & billing updates here"}
             error={errors.email}
           />
         </FadeUp>
@@ -304,7 +310,24 @@ export function ProfileForm({
                 error={errors.pincode}
                 containerStyle={{ flex: 1 }}
               />
-              <Field label="City" value={city} onChangeText={setCity} placeholder="Mumbai" maxLength={60} error={errors.city} containerStyle={{ flex: 1.2 }} />
+              {/* A picker, not free text, so every member's city has one spelling and Citywide matches. */}
+              <Pressable
+                onPress={() => setPickingCity(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`City: ${city || 'not chosen'}. Choose city`}
+                style={{ flex: 1.2 }}
+              >
+                <View pointerEvents="none">
+                  <Field
+                    label="City"
+                    value={city}
+                    editable={false}
+                    placeholder="Choose"
+                    right={<ChevronDown size={s(12)} color={colors.text} />}
+                    error={errors.city}
+                  />
+                </View>
+              </Pressable>
             </View>
           </View>
         </FadeUp>
@@ -356,6 +379,24 @@ export function ProfileForm({
           <CtaButton label={mode === 'create' ? 'Continue' : 'Save changes'} onPress={save} loading={busy} />
         </Footer>
       </FadeUp>
+
+      <Modal visible={pickingCity} transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setPickingCity(false)}>
+        <BottomSheet onDismiss={() => setPickingCity(false)} scroll>
+          <Text style={{ fontFamily: fonts.display, fontSize: s(20), color: colors.ink, marginBottom: s(6) }} accessibilityRole="header">
+            Your business city
+          </Text>
+          <Text style={[t.meta, { marginBottom: s(16) }]}>Members in the same city find you in Citywide.</Text>
+          <CityPicker
+            value={city || null}
+            onChange={(c) => {
+              setCity(c);
+              if (errors.city) setErrors((prev) => ({ ...prev, city: undefined }));
+              setPickingCity(false);
+            }}
+            baseDelay={120}
+          />
+        </BottomSheet>
+      </Modal>
     </>
   );
 }

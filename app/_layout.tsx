@@ -7,23 +7,29 @@ import {
   DMSans_700Bold,
   DMSans_800ExtraBold,
 } from '@expo-google-fonts/dm-sans';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { envReady } from '../src/lib/env';
-import { initSentry, reportError, Sentry } from '../src/lib/sentry';
+import { env, envReady } from '../src/lib/env';
+import { initSentry, navigationIntegration, reportError, Sentry } from '../src/lib/sentry';
 import { AppProvider } from '../src/state/AppStore';
+import { CtaButton } from '../src/ui/Buttons';
 import { AuthProvider } from '../src/state/AuthProvider';
 import { colors, fonts, s } from '../src/theme/tokens';
 
 initSentry();
+// Which backend this bundle talks to — shows in Metro on every start, and on every Sentry event.
+const supabaseRef = env.supabaseUrl.replace(/^https:\/\/([^.]+)\..*$/, '$1');
+console.log(`[env] ${env.appEnv} · supabase ${supabaseRef} · sentry ${env.sentryDsn ? 'on' : 'off'}`);
+Sentry.setTag('supabase_project', supabaseRef);
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: (e, q) => reportError(e, { where: 'query', key: JSON.stringify(q.queryKey) }) }),
   defaultOptions: {
     queries: { staleTime: 30 * 1000, retry: 1 },
     mutations: { onError: (e) => reportError(e, { where: 'mutation' }) },
@@ -37,7 +43,25 @@ const overlay = {
   contentStyle: { backgroundColor: 'transparent' },
 };
 
+/** Shown instead of a dead app when a screen throws while rendering. Sentry has already logged it. */
+function CrashScreen({ resetError }: { resetError: () => void }) {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', padding: s(28), backgroundColor: colors.bg }}>
+      <Text style={{ fontFamily: fonts.display, fontSize: s(24), color: colors.ink }}>Something went wrong</Text>
+      <Text style={{ fontFamily: fonts.body, fontSize: s(15), lineHeight: s(22), color: colors.text, marginTop: s(8), marginBottom: s(24) }}>
+        We've been notified and are looking into it. Please try again.
+      </Text>
+      <CtaButton label="Try again" onPress={resetError} />
+    </View>
+  );
+}
+
 function RootLayout() {
+  const navRef = useNavigationContainerRef();
+  useEffect(() => {
+    if (navRef) navigationIntegration.registerNavigationContainer(navRef);
+  }, [navRef]);
+
   const [loaded, error] = useFonts({
     Baloo2_700Bold,
     Baloo2_800ExtraBold,
@@ -70,6 +94,7 @@ function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
+        <Sentry.ErrorBoundary fallback={CrashScreen}>
         <AuthProvider>
           <AppProvider>
             <Stack
@@ -84,6 +109,7 @@ function RootLayout() {
               <Stack.Screen name="location" options={{ animation: 'fade', gestureEnabled: false }} />
               <Stack.Screen name="welcome-city" options={{ animation: 'fade' }} />
               <Stack.Screen name="onboarding/nearby" options={{ animation: 'fade' }} />
+              <Stack.Screen name="auth/phone" options={{ animation: 'fade', gestureEnabled: false }} />
               <Stack.Screen name="auth/notifications" options={{ animation: 'fade', gestureEnabled: false }} />
               <Stack.Screen name="paywall" options={{ gestureEnabled: false }} />
               <Stack.Screen name="(tabs)" options={{ animation: 'fade', gestureEnabled: false }} />
@@ -95,6 +121,7 @@ function RootLayout() {
             </Stack>
           </AppProvider>
         </AuthProvider>
+        </Sentry.ErrorBoundary>
       </QueryClientProvider>
     </SafeAreaProvider>
   );

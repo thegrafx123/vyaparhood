@@ -11,6 +11,12 @@ export function friendlyError(e: unknown): string {
   if (/token has expired|invalid otp|otp_expired|invalid token/i.test(msg)) {
     return 'That code is wrong or has expired. Request a new one.';
   }
+  if (/error sending|confirmation email|magic link email|smtp|email.*(send|deliver)/i.test(msg)) {
+    return "We couldn't send the email right now. Please try again in a minute.";
+  }
+  if (/invalid email|email.*invalid|unable to validate email/i.test(msg)) {
+    return 'Enter a valid email address.';
+  }
   if (/sms|phone provider|unsupported phone provider|twilio/i.test(msg)) {
     return "We couldn't send the SMS right now. Please try again in a minute.";
   }

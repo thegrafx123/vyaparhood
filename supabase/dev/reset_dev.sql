@@ -18,6 +18,7 @@
 -- 1. Sign-up triggers on auth.users (old and new schema).
 drop trigger if exists on_auth_user_created on auth.users;
 drop trigger if exists on_auth_user_phone_confirmed on auth.users;
+drop trigger if exists on_auth_user_email_confirmed on auth.users;
 
 -- 2. The app's storage policies (the buckets are handled in the dashboard).
 drop policy if exists "avatars: members and owner can view" on storage.objects;

@@ -1,5 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
+import { PushBridge } from '../../src/api/PushBridge';
 import { RealtimeBridge } from '../../src/api/RealtimeBridge';
 import { isActiveMember } from '../../src/api/types';
 import { routeForMe } from '../../src/lib/routing';
@@ -20,6 +21,7 @@ export default function TabsLayout() {
   return (
     <>
       <RealtimeBridge />
+      <PushBridge />
       <Tabs screenOptions={{ headerShown: false, animation: 'fade' }} tabBar={(props) => <TabBar {...(props as any)} />}>
         <Tabs.Screen name="discover" />
         <Tabs.Screen name="requests" />

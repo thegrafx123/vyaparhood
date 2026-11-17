@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { setOpenChat } from '../../src/services/notifications';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Keyboard, Pressable, ScrollView, ScrollViewInstance, Text, TextInput, TextInputInstance, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as api from '../../src/api';
 import { friendlyError } from '../../src/api/errors';
@@ -38,12 +39,17 @@ export default function ChatThread() {
   const sendMessage = useSendMessage(connectionId);
   const [text, setText] = useState('');
   const [emoji, setEmoji] = useState(false);
-  const scroll = useRef<ScrollView>(null);
-  const input = useRef<TextInput>(null);
+  const scroll = useRef<ScrollViewInstance>(null);
+  const input = useRef<TextInputInstance>(null);
   const selection = useRef({ start: 0, end: 0 });
   // Messages present when the thread opens cascade in; new ones slide in at once.
   const firstBatch = useRef<number | null>(null);
   if (firstBatch.current === null && !isLoading) firstBatch.current = messages.length;
+
+  useEffect(() => {
+    setOpenChat(connectionId);
+    return () => setOpenChat(null);
+  }, [connectionId]);
 
   // Mark as read on open and whenever a new message arrives while open.
   const lastId = messages[messages.length - 1]?.id;

@@ -18,7 +18,7 @@ export default function OnboardingContext() {
   const router = useRouter();
   return (
     <Screen texture>
-      <BrandRow onSkip={() => router.push('/auth/phone')} />
+      <BrandRow onSkip={() => router.push('/auth/email')} />
 
       <FadeUp delay={100} style={{ paddingHorizontal: H_PAD, paddingTop: s(24) }}>
         <AccentHeading parts={['Connect with context,', { accent: 'not cold DMs', drawDelay: 500 }]} size={29} accentSize={34} />

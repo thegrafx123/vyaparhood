@@ -10,7 +10,7 @@ export default function Guidelines() {
       sections={[
         {
           title: 'Be real',
-          body: 'Use your real name and a real photo of yourself, and describe your business and its address accurately. Every member verifies their phone number, so people know they are talking to a real person.',
+          body: 'Use your real name and a real photo of yourself, and describe your business and its address accurately. Every member verifies their email address, so people know they are talking to a real person.',
         },
         {
           title: 'Be respectful',

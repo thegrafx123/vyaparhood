@@ -90,26 +90,54 @@ export async function geocodeAddress(parts: {
   }
 }
 
-/** Geocoders say "Bengaluru" or "Bangalore", "New Delhi" or "Delhi"… */
-export function normaliseCity(city: string | null): string | null {
-  if (!city) return null;
-  const c = city.trim();
-  const map: Record<string, string> = {
-    Bangalore: 'Bengaluru',
-    'Bengaluru Urban': 'Bengaluru',
-    Bombay: 'Mumbai',
-    'Mumbai Suburban': 'Mumbai',
-    'New Delhi': 'Delhi NCR',
-    Delhi: 'Delhi NCR',
-    Gurgaon: 'Gurugram',
-    Calcutta: 'Kolkata',
-    Madras: 'Chennai',
-    Cochin: 'Kochi',
-    Ernakulam: 'Kochi',
-    Mysore: 'Mysuru',
-    Trivandrum: 'Thiruvananthapuram',
-  };
-  return map[c] ?? c;
+/**
+ * One spelling per city: geocoders and people say "Bengaluru" or
+ * "Bangalore", "New Delhi" or "Delhi"… Citywide matches on this name, so
+ * every city is stored in its standard form. Keep in sync with
+ * canonical_city() in supabase/migrations/20261102000000_canonical_cities.sql.
+ */
+const CITY_ALIASES: Record<string, string> = {
+  bangalore: 'Bengaluru',
+  bengaluru: 'Bengaluru',
+  'bengaluru urban': 'Bengaluru',
+  'bangalore urban': 'Bengaluru',
+  bombay: 'Mumbai',
+  mumbai: 'Mumbai',
+  'mumbai suburban': 'Mumbai',
+  'mumbai city': 'Mumbai',
+  'new delhi': 'Delhi NCR',
+  delhi: 'Delhi NCR',
+  'delhi ncr': 'Delhi NCR',
+  gurgaon: 'Gurugram',
+  gurugram: 'Gurugram',
+  calcutta: 'Kolkata',
+  kolkata: 'Kolkata',
+  madras: 'Chennai',
+  chennai: 'Chennai',
+  cochin: 'Kochi',
+  ernakulam: 'Kochi',
+  kochi: 'Kochi',
+  mysore: 'Mysuru',
+  mysuru: 'Mysuru',
+  mangalore: 'Mangaluru',
+  mangaluru: 'Mangaluru',
+  trivandrum: 'Thiruvananthapuram',
+  thiruvananthapuram: 'Thiruvananthapuram',
+  poona: 'Pune',
+  pune: 'Pune',
+  baroda: 'Vadodara',
+  vadodara: 'Vadodara',
+  vizag: 'Visakhapatnam',
+  visakhapatnam: 'Visakhapatnam',
+  hyderabad: 'Hyderabad',
+  ahmedabad: 'Ahmedabad',
+  jaipur: 'Jaipur',
+};
+
+export function normaliseCity(city: string | null | undefined): string | null {
+  const c = (city ?? '').trim().replace(/\s+/g, ' ');
+  if (!c) return null;
+  return CITY_ALIASES[c.toLowerCase()] ?? c;
 }
 
 /**

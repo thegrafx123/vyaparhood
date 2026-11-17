@@ -4,7 +4,7 @@ import { Text, View } from 'react-native';
 import * as api from '../src/api';
 import { friendlyError } from '../src/api/errors';
 import { DELETE_AFTER_DAYS } from '../src/config';
-import { routeForMe } from '../src/lib/routing';
+import { resetTo, routeForMe } from '../src/lib/routing';
 import { FadeUp } from '../src/motion';
 import { useApp } from '../src/state/AppStore';
 import { useAuth } from '../src/state/AuthProvider';
@@ -31,7 +31,7 @@ export default function RestoreAccount() {
     try {
       await api.me.cancelDeletion();
       const fresh = await refreshMe();
-      router.replace(routeForMe(fresh, state.flags) as never);
+      resetTo(router, routeForMe(fresh, state.flags));
     } catch (e) {
       setError(friendlyError(e));
       setBusy(false);
@@ -41,7 +41,7 @@ export default function RestoreAccount() {
   const leave = async () => {
     await api.auth.signOut();
     actions.resetSession();
-    router.replace('/welcome');
+    resetTo(router, '/welcome');
   };
 
   return (

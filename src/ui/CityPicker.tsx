@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { ALL_CITIES, POPULAR_CITIES } from '../config';
+import { normaliseCity } from '../services/location';
 import { FadeUp } from '../motion';
 import { colors, s } from '../theme/tokens';
 import { type as t } from '../theme/typography';
@@ -34,8 +35,9 @@ export function CityPicker({
   const chips = useMemo(() => {
     if (q) {
       const hits = ALL_CITIES.filter((c) => c.toLowerCase().includes(q)).slice(0, 12);
-      const typed = titleCase(query);
-      return hits.some((h) => h.toLowerCase() === q) || typed.length < 3 ? hits : [...hits, typed];
+      // A city not in the list can still be picked, in its standard spelling ("bangalore" → "Bengaluru").
+      const typed = normaliseCity(titleCase(query)) ?? '';
+      return hits.some((h) => h.toLowerCase() === typed.toLowerCase()) || typed.length < 3 ? hits : [...hits, typed];
     }
     const list = [...POPULAR_CITIES];
     for (const extra of [value, suggested]) {

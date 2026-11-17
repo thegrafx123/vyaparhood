@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "239241125732",
+    "project_id": "vyaparhood",
+    "storage_bucket": "vyaparhood.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:239241125732:android:abec3ef328f8ffa9a02471",
+        "android_client_info": {
+          "package_name": "in.vyaparhood.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMO_wTt5twwACVR7TxqMTvgj9liIgM4UA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

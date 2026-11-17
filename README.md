@@ -1,10 +1,10 @@
 # Vyaparhood — app + Supabase backend
 
-Expo / React Native app (Expo SDK 57, Reanimated 4) with a Supabase backend
+Expo / React Native app (Expo SDK 58, Reanimated 4) with a Supabase backend
 (Postgres + PostGIS, Auth, Storage, Realtime, Edge Functions) and Sentry
 error tracking.
 
-What works end to end: phone-number OTP sign-in, onboarding with every
+What works end to end: email OTP sign-in, onboarding with every
 animation from the design, profile with one photo and a business address,
 Nearby (radar) and Citywide discovery, member profiles, connection requests
 with notes, realtime chat with emoji, notifications, saved profiles, ratings,
@@ -66,64 +66,52 @@ called `avatars`.
 > a fresh project, or on dev only: `npx supabase@latest db reset --linked`
 > (this **erases everything** in that database), then `db push`.
 
-### 1.3 Phone login (SMS OTP)
+### 1.3 Email login (email OTP)
 
-Dashboard → **Authentication → Sign In / Providers → Phone**:
+Members sign in with a 6-digit code sent to their email. (Phone login is
+switched off for now; the phone triggers stay in the database so it can come
+back later.)
 
-1. Turn **Enable Phone provider** on.
-2. **SMS OTP length:** `6` (the app expects 6 digits — `OTP_LENGTH` in `src/config.ts`).
-3. **SMS OTP expiry:** `600` seconds.
-4. Choose an SMS provider (next two sections).
+Dashboard → **Authentication → Sign In / Providers → Email**:
 
-Also turn **off** the Email provider if you don't want email sign-ups at all
-(the app only uses phone).
+1. **Enable Email provider**: on. **Confirm email**: on.
+2. **Email OTP length:** `6` (the app expects 6 digits — `OTP_LENGTH` in `src/config.ts`).
+3. **Email OTP expiry:** `600` seconds.
 
-#### Dev: test numbers (no SMS needed)
+Dashboard → **Authentication → Emails → Templates → Magic Link** (and also
+**Confirm signup**). Supabase sends a link by default; replace the body so it
+sends the code instead:
 
-In the same Phone settings, fill **Test Phone Numbers and OTPs**, one per line,
-country code + number, digits only:
-
+```html
+<h2>Your Vyaparhood code</h2>
+<p>Enter this code in the app to sign in:</p>
+<p style="font-size:28px;font-weight:bold;letter-spacing:4px">{{ .Token }}</p>
+<p>It expires in 10 minutes. If you didn't ask for it, ignore this email.</p>
 ```
-919999999999=123456
-919888888888=654321
-```
 
-and set **Test OTPs valid until** to a date a few months ahead. Those numbers
-log in with the fixed code and no SMS is ever sent. If the dashboard won't
-save the Phone provider without SMS-provider credentials, enter the Twilio
-details from the next step (or placeholders on dev) — test numbers never use them.
+Subject: `Your Vyaparhood code: {{ .Token }}`
 
-#### Prod: a real SMS provider
+#### Sending limits (important)
 
-Indian SMS needs a TRAI DLT-registered sender. The simplest route with
-Supabase's built-in providers is **Twilio Verify**:
-
-1. Create a Twilio account → **Verify → Services → Create** (name: Vyaparhood,
-   code length 6). Read Twilio's current notes on sending OTPs to India.
-2. In Supabase's Phone provider choose **Twilio Verify** and paste the
-   **Account SID**, **Auth Token** and **Verify Service SID**.
-3. **Authentication → Rate Limits → SMS sent per hour**: raise from the
-   default to what you expect at launch.
-4. Log in once with your own real number to confirm SMS delivery.
-
-Cheaper Indian gateways (MSG91, Gupshup, Fast2SMS) can be plugged in later
-through Supabase's **Send SMS Hook** (Authentication → Hooks) with a small
-Edge Function — no app change needed.
+Supabase's built-in mailer sends only a few emails per hour and is meant for
+testing. Before real users, add your own SMTP (**Authentication → Emails →
+SMTP Settings**). Free tiers that work well: **Resend** (3,000/month),
+**Brevo** (300/day). Then raise **Authentication → Rate Limits → Emails sent
+per hour**.
 
 ### 1.4 Root admin and demo data
 
-**Dev only:** open `supabase/dev/seed_dev.sql`, replace `919999999999` (two
-places) with the number you test with (use one of your test numbers from 1.3),
-then run the file in the SQL Editor. It:
+**Dev only:** open `supabase/dev/seed_dev.sql`, replace `you@example.com` (two
+places) with the email you test with, then run the file in the SQL Editor. It:
 
-* makes that number the root admin,
+* makes that email the root admin,
 * creates 10 demo businesses around Bandra, Mumbai,
-* when that number signs up: 2 incoming requests (Karan, Neha), 2 chats
+* when that email signs up: 2 incoming requests (Karan, Neha), 2 chats
   (Riya, Arjun), 3 saved profiles, and the demo businesses move to within a
   few km of wherever you are testing, in your city.
 
-**Prod:** edit `supabase/prod/bootstrap_prod.sql` (replace `91XXXXXXXXXX` in
-two places with the admin's number), then run it. No demo data.
+**Prod:** edit `supabase/prod/bootstrap_prod.sql` (replace `admin@example.com` in
+two places with the admin's email), then run it. No demo data.
 
 Both files are safe to run again and also work if the account already exists.
 
@@ -165,7 +153,7 @@ EAS cloud builds don't see `.env` files, so also replace the placeholders in
 3. In `app.json`, replace `REPLACE_WITH_SENTRY_ORG` with your organisation slug.
 4. For readable stack traces in production builds: `eas secret:create --name SENTRY_AUTH_TOKEN`.
 
-Only a random user id is sent to Sentry — never phone numbers or locations.
+Only a random user id is sent to Sentry — never emails, phone numbers or locations.
 
 ### 1.8 Dev vs prod at a glance
 
@@ -173,7 +161,7 @@ Only a random user id is sent to Sentry — never phone numbers or locations.
 |---|---|---|
 | Plan | Free | Pro |
 | Migration (1.2) | ✓ | ✓ |
-| Phone login (1.3) | Test numbers (+ Twilio when ready) | Twilio Verify (real SMS), higher rate limit |
+| Email login (1.3) | Built-in mailer is fine | Own SMTP (Resend/Brevo), higher rate limit |
 | Seed / bootstrap (1.4) | `dev/seed_dev.sql` | `prod/bootstrap_prod.sql` — **never** the dev seed |
 | Deletion job (1.5) | ✓ (own secret) | ✓ (own secret) |
 | App keys (1.6) | `.env.development`, eas dev/preview | `.env.production`, eas production |
@@ -201,8 +189,8 @@ code. Settings shows "DEVELOPMENT" at the bottom when you're on the dev project.
    **City splash (2b, "Your Surat business, sorted")**, shown once.
    Don't allow → an explanation that Nearby needs location → still no →
    straight to onboarding.
-3. **Onboarding (3 → 4 → 5)** — *Skip* on any of them jumps to the phone page.
-4. **Phone + OTP (6+7 on one page)** → **Consent (8)** → **City (9)** →
+3. **Onboarding (3 → 4 → 5)** — *Skip* on any of them jumps to the email page.
+4. **Email + OTP (6+7 on one page)** → **Consent (8)** → **City (9)** →
    **Profile + business address (10)** → **Notifications (13)** →
    **Plans (14)** → **Discover (15)**.
 

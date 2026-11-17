@@ -38,7 +38,7 @@ export default function OnboardingWhy() {
   return (
     <Screen texture>
       <Blob color={colors.lime} size={s(280)} opacity={0.85} rotate="12deg" style={{ top: -s(110), right: -s(120) }} />
-      <BrandRow onSkip={() => router.push('/auth/phone')} />
+      <BrandRow onSkip={() => router.push('/auth/email')} />
 
       <FadeUp delay={80} style={{ paddingHorizontal: H_PAD, paddingTop: s(26) }}>
         <AccentHeading parts={['Not another', { accent: 'networking', squiggle: 'ink', drawDelay: 500 }, 'app']} size={29} accentSize={35} />
@@ -89,7 +89,7 @@ export default function OnboardingWhy() {
       <FadeUp delay={500}>
         <Footer style={{ alignItems: 'center', gap: s(16), paddingTop: s(18) }}>
           <PageDots count={4} active={3} />
-          <CtaButton label="Let's Go" onPress={() => router.push('/auth/phone')} style={{ alignSelf: 'stretch' }} />
+          <CtaButton label="Let's Go" onPress={() => router.push('/auth/email')} style={{ alignSelf: 'stretch' }} />
         </Footer>
       </FadeUp>
     </Screen>

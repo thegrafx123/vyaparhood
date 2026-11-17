@@ -15,7 +15,7 @@ export default function Terms() {
         },
         {
           title: 'Your account',
-          body: "You sign in with your mobile number and a one-time code. You're responsible for the accuracy of your profile — including your business address — and for keeping access to your phone number secure. One account per person.",
+          body: "You sign in with your email address and a one-time code. You're responsible for the accuracy of your profile — including your business address — and for keeping access to your email account secure. One account per person.",
         },
         {
           title: 'Membership & billing',
