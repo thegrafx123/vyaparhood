@@ -84,26 +84,48 @@ function Accent({
   accentSize: number;
   space: number;
 }) {
-  const [width, setWidth] = useState(0);
+  // Width of the bare word (drives the underline) and of the word plus
+  // its trailing room (so we can take that room back from the gap).
+  const [wordW, setWordW] = useState(0);
+  const [fullW, setFullW] = useState(0);
   const squiggle = part.squiggle === undefined ? 'lime' : part.squiggle;
-  // Caveat's slanted strokes draw past the width the text is measured at,
-  // so the last letter gets clipped. Pad the text box to give the tail
-  // room, and take the same amount back from the gap and the underline so
-  // the layout doesn't change.
-  const tail = accentSize * 0.14;
+  // Caveat's slanted strokes and descenders draw outside the box the text
+  // is measured at, and Android clips them (the "d" of sorted, "y" of
+  // city, "s" of DMs, "g" of networking). Padding the view doesn't help on
+  // Android, so:
+  //  - append real non-breaking spaces, which the text engine counts as
+  //    width, so the last letter's tail has room inside the text box;
+  //  - use a taller line so descenders aren't cut at the bottom, and pull
+  //    the same amount back with negative margins so the layout stays put.
+  const TAIL = '  ';
+  const tight = accentSize * 1.08;
+  const roomy = accentSize * 1.4;
+  const vPad = (roomy - tight) / 2;
+  const tailW = wordW > 0 && fullW > wordW ? fullW - wordW : 0;
+  const textStyle: TextStyle = { fontFamily: fonts.script, fontSize: accentSize, color: colors.blue };
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', marginRight: Math.max(0, space - tail) }}>
-      <View>
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', marginRight: Math.max(0, space - tailW) }}>
+      <View style={{ marginVertical: -vPad }}>
+        {/* Invisible copy of the bare word, only to measure its width. */}
         <Text
-          onLayout={(e) => setWidth(e.nativeEvent.layout.width - tail)}
-          style={[base, { fontFamily: fonts.script, fontSize: accentSize, lineHeight: accentSize * 1.08, color: colors.blue, paddingRight: tail }]}
+          aria-hidden
+          importantForAccessibility="no-hide-descendants"
+          onLayout={(e) => setWordW(e.nativeEvent.layout.width)}
+          style={[base, textStyle, { lineHeight: roomy, position: 'absolute', opacity: 0 }]}
+          numberOfLines={1}
         >
           {part.accent}
         </Text>
-        {squiggle && width > 0 && (
-          <View pointerEvents="none" style={{ position: 'absolute', left: 0, bottom: -s(4) }}>
+        <Text
+          onLayout={(e) => setFullW(e.nativeEvent.layout.width)}
+          style={[base, textStyle, { lineHeight: roomy }]}
+        >
+          {part.accent + TAIL}
+        </Text>
+        {squiggle && wordW > 0 && (
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, bottom: vPad - s(4) }}>
             <Squiggle
-              width={width}
+              width={wordW}
               color={squiggle === 'lime' ? colors.lime : colors.ink}
               animate={part.animate ?? true}
               delay={part.drawDelay ?? 550}
@@ -111,7 +133,7 @@ function Accent({
           </View>
         )}
       </View>
-      {part.suffix ? <Text style={[base, { marginLeft: -tail }]}>{part.suffix}</Text> : null}
+      {part.suffix ? <Text style={[base, { marginLeft: -tailW }]}>{part.suffix}</Text> : null}
     </View>
   );
 }
